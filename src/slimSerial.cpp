@@ -4,7 +4,7 @@
 #include "cmsis_os.h"
 #include <type_traits>
 //#include <unordered_map>
-
+#include "slimRegister.h"
 
 
 
@@ -1059,7 +1059,7 @@ void SlimSerial::rxHandlerThread() {
 											
 											if(funcodeIn == FUNC_ENABLE_PROXY){
 												//enable proxy
-												enableProxy(m_rx_last[5]);
+												enableProxy(m_rx_last.pdata[5]);
 												ackProxy();
 											}
 											else{
@@ -1130,9 +1130,9 @@ void SlimSerial::rxHandlerThread() {
 					m_rx_last.pdata[2]==0x00 &&
 					m_rx_last.pdata[3]==0x07 &&
 					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY)
-					)
+					){
 					uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
-					uint16_t crc2 = m_rx_last.pdata[5] || ((uint16_t)m_rx_last.pdata[6])<<8 ;
+					uint16_t crc2 = m_rx_last.pdata[5] | ((uint16_t)m_rx_last.pdata[6])<<8 ;
 					if(crc1 == crc2){
 						//disable proxy
 						disableProxy();
@@ -1444,8 +1444,9 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
     return m_proxy_mode;
 
 }
+
 void SlimSerial::enableProxy(uint8_t proxy_port_index){
-	SlimSerial *proxy_port_; 
+	SlimSerial *proxy_port_;
 	switch(proxy_port_index){
 			#if ENABLE_SLIMSERIAL_USART1
 			case 1:
@@ -1486,7 +1487,7 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index){
 			case 8:
 				proxy_port_ = &slimSerial8;
 				break;
-			#endif	
+			#endif
 			default:
 				proxy_port_ = NULL;
 				break;
