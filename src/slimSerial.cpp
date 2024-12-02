@@ -306,9 +306,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_totalRxBytes=0;
 	m_totalTxFrames=0;
 	m_totalRxFrames=0;
-
-
-
+  
 	//header whitelist    5A A5   or FF FF
 	addHeaderFilter(0x5A,0xA5);
 	addHeaderFilter(0xFF,0xFF);
@@ -1012,117 +1010,138 @@ void SlimSerial::rxHandlerThread() {
 		}
 		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
 			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
-//			if(m_huart==&huart1){
-//
-//				for(int i=0;i<remainingBytes;i++){
-//					serialTemp[i] = m_rx_circular_buf.peekAt(i);
-//				}
-//				m_rx_status = SD_USART_OK;
-//
-//			}
-
 			//5+N+2
 			//Header1 + Header2 + Src + dataBytes +  Funcode  + data + crc16
 			// dataBytes =   sizeof(data)
-			while (remainingBytes >= 7) {
+			if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+				while (remainingBytes >= 7) {
 
-				//check header, current support 5A A5 and FF FF
-				uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
-				if (applyHeaderFilter(header[0], header[1])) {
+					//check header, current support 5A A5 and FF FF
+					uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
+					if (applyHeaderFilter(header[0], header[1])) {
 
-					//check address. disabled by default. Call toggleAddressFilter(True) to enable
-					uint8_t addressIn = m_rx_circular_buf.peekAt(2);
-					if(applyAddressFilter(addressIn)){
+						//check address. disabled by default. Call toggleAddressFilter(True) to enable
+						uint8_t addressIn = m_rx_circular_buf.peekAt(2);
+						if(applyAddressFilter(addressIn)){
 
-						//check address. disabled by default. Call toggleFuncodeFilter(True) to enable
-						uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
-						if(applyFuncodeFilter(funcodeIn)){
+							//check address. disabled by default. Call toggleFuncodeFilter(True) to enable
+							uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
+							if(applyFuncodeFilter(funcodeIn)){
 
-							//total frame length
-							uint16_t expectedFrameBytes;
-							if(lengthFilterOn){
-								expectedFrameBytes = m_rx_circular_buf.peekAt(3) + 7;
-							}
-							else{
-								expectedFrameBytes=remainingBytes;
-							}
-							//check length
-							if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
+								//total frame length
+								uint16_t expectedFrameBytes;
+								if(lengthFilterOn){
+									expectedFrameBytes = m_rx_circular_buf.peekAt(3) + 7;
+								}
+								else{
+									expectedFrameBytes=remainingBytes;
+								}
+								//check length
+								if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
 
-								if (expectedFrameBytes <= remainingBytes) {
+									if (expectedFrameBytes <= remainingBytes) {
 
-									//valid CRC
-									uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-									uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
+										//valid CRC
+										uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+										uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
 
-									if (crc1 == crc2) {
+										if (crc1 == crc2) {
 
-										//read out one valid frame from ring buffer to m_rx_last
-										m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
-										m_rx_last.dataBytes = expectedFrameBytes;
-										remainingBytes -= expectedFrameBytes;
-										//process frame
+											//read out one valid frame from ring buffer to m_rx_last
+											m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
+											m_rx_last.dataBytes = expectedFrameBytes;
+											remainingBytes -= expectedFrameBytes;
+											//process frame
 
-										receivedACK = true;
+											receivedACK = true;
 
-										m_totalRxFrames++;
+											m_totalRxFrames++;
+											
+											if(funcodeIn == FUNC_ENABLE_PROXY){
+												//enable proxy
+												enableProxy(m_rx_last[5]);
+												ackProxy();
+											}
+											else{
+												callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
+													//notify potential txrx thread
+												if (txrxThreadID != NULL) {
+													xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+												}
 
-										callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
-
-
-
-										//notify potential txrx thread
-										if (txrxThreadID != NULL) {
-											xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+												m_rx_status = SD_USART_OK;
+												continue;
+											}
 										}
 
-										m_rx_status = SD_USART_OK;
-										continue;
+										else {
+											//bad crc
+											m_rx_circular_buf.out(1);
+											remainingBytes--;
+											m_rx_status = SD_USART_ERROR;
+											continue;
+										}
+
+									} else {
+										//unfinished frame
+										m_rx_status = SD_USART_BUSY;
+										break;
 
 									}
-
-									else {
-										//bad crc
-										m_rx_circular_buf.out(1);
-										remainingBytes--;
-										m_rx_status = SD_USART_ERROR;
-										continue;
-									}
-
-								} else {
-									//unfinished frame
-									m_rx_status = SD_USART_BUSY;
-									break;
-
+								}
+								else{//invalid length
+									m_rx_circular_buf.out(1);
+									remainingBytes--;
+									m_rx_status = SD_USART_ERROR;
+									continue;
 								}
 							}
-							else{//invalid length
+							else{//invalid funcode
 								m_rx_circular_buf.out(1);
 								remainingBytes--;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
 						}
-						else{//invalid funcode
+						else{//invalid address
 							m_rx_circular_buf.out(1);
 							remainingBytes--;
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
-					}
-					else{//invalid address
+					} else {//invalid header
 						m_rx_circular_buf.out(1);
 						remainingBytes--;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
-				} else {//invalid header
-					m_rx_circular_buf.out(1);
-					remainingBytes--;
-					m_rx_status = SD_USART_ERROR;
-					continue;
-				}
 
+				}
+			}
+			else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+				m_rx_circular_buf.out(m_rx_last.pdata, remainingBytes);
+				m_rx_last.dataBytes = remainingBytes;
+				m_totalRxFrames++;
+
+				//in transparent mode, only check FUNC_DISABLE_PROXY to disable proxy
+				if( m_rx_last.dataBytes>=7 &&
+				 	m_rx_last.pdata[0]==0x5A &&
+					m_rx_last.pdata[1]==0xA5 &&
+					m_rx_last.pdata[2]==0x00 &&
+					m_rx_last.pdata[3]==0x07 &&
+					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY)
+					)
+					uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
+					uint16_t crc2 = m_rx_last.pdata[5] || ((uint16_t)m_rx_last.pdata[6])<<8 ;
+					if(crc1 == crc2){
+						//disable proxy
+						disableProxy();
+						ackProxy();
+					}
+				}
+				else{
+					proxyDelegateMessage(m_rx_last.pdata, m_rx_last.dataBytes);
+				}
 			}
 		}
 		else if (m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_2){
@@ -1412,6 +1431,90 @@ void SlimSerial::restartRxFromISR(){
 	vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
+
+void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
+	m_proxy_port->transmitData(pData,databytes);
+}
+void SlimSerial::ackProxy(){
+	transmitFrame(0x00,FUNC_ACK_PROXY,NULL,0);
+}
+ 
+SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
+
+    return m_proxy_mode;
+
+}
+void SlimSerial::enableProxy(uint8_t proxy_port_index){
+	SlimSerial *proxy_port_; 
+	switch(proxy_port_index){
+			#if ENABLE_SLIMSERIAL_USART1
+			case 1:
+				proxy_port_ = &slimSerial1;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART2
+			case 2:
+				proxy_port_ = &slimSerial2;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART3
+			case 3:
+				proxy_port_ = &slimSerial3;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART4
+			case 4:
+				proxy_port_ = &slimSerial4;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART5
+			case 5:
+				proxy_port_ = &slimSerial5;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART6
+			case 6:
+				proxy_port_ = &slimSerial6;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART7
+			case 7:
+				proxy_port_ = &slimSerial7;
+				break;
+			#endif
+			#if ENABLE_SLIMSERIAL_USART8
+			case 8:
+				proxy_port_ = &slimSerial8;
+				break;
+			#endif	
+			default:
+				proxy_port_ = NULL;
+				break;
+		}
+
+
+	if(proxy_port_){
+		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){//stop previous proxy
+			disableProxy();
+		}
+		m_proxy_port = proxy_port_;
+		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
+		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT;
+		m_proxy_port->m_proxy_port = this;
+	}
+}
+void SlimSerial::disableProxy(){
+	if(m_proxy_port!=NULL){
+		m_proxy_port->transmitFrame(0x00,FUNC_DISABLE_PROXY,NULL,0);//chain
+		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
+		m_proxy_port->m_proxy_port = NULL;
+	}
+	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
+	m_proxy_port = NULL;
+}
+
+
+
 
 
 

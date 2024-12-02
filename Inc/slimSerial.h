@@ -89,10 +89,12 @@ typedef enum
   SLIMSERIAL_FRAME_TYPE_NONE = 99
 }SLIMSERIAL_FRAME_TYPE_ENUM;
 ;
-
-
-
-
+typedef enum
+{
+  SLIMSERIAL_TXRX_NORMAL = 0,
+  SLIMSERIAL_TXRX_TRANSPARENT = 1
+}SLIMSERIAL_PROXY_MODE;
+ 
 class SlimSerial{
 
 public:
@@ -171,6 +173,15 @@ public:
 	uint8_t rxNeedRestart;
 
 	void restartRxFromISR();
+
+	//proxy
+	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
+	void enableProxy(uint8_t proxy_port_index);
+	void disableProxy();
+	void ackProxy();
+	SLIMSERIAL_PROXY_MODE getProxyMode();
+	SlimSerial *m_proxy_port;
+	SLIMSERIAL_PROXY_MODE m_proxy_mode; 
 
 private:
 
@@ -298,7 +309,7 @@ private:
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
-
+  
 	//txrx task
 	uint32_t *txrxThreadID;
 
