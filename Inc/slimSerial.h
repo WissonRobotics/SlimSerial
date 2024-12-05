@@ -8,7 +8,7 @@
 #include <functional>
 #include <slimCircularBuffer.hpp>
 #include "static_queue.hpp"
-#include "slimSerial_config.h"
+#include "slimSerial_Configs.h"
 
 #define INTERNAL_MAX_FRAME_SIZE 1024
 
@@ -179,7 +179,7 @@ public:
 	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate);
 	void disableProxy();
 	void ackProxy();
-	void setBaudrate(SlimSerial *pSerial,uint32_t baudrate=0);
+	void setBaudrate(uint32_t baudrate=0);
 	SLIMSERIAL_PROXY_MODE getProxyMode();
 	SlimSerial *m_proxy_port;
 	SLIMSERIAL_PROXY_MODE m_proxy_mode; 
