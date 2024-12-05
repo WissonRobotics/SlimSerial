@@ -1,7 +1,9 @@
 slimSerial_config.h
+slimSerial_Configs.h
 Inc/slimSerial_config.h
 src/slimSerial_config.h
-
+Inc/slimSerial_Configs.h
+src/slimSerial_Configs.h
 # Auto generated files
 [Dd]ebug/
 [Rr]elease/
