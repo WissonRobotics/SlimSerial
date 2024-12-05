@@ -31,15 +31,15 @@ public:
 
 		reset();
 	}
-
-	void reset(uint8_t *pBuf=NULL, uint16_t bufzise=0) {
+	void reset(uint8_t *pBuf, uint16_t bufzise) {
 
 		if(pBuf){
 			buffer = pBuf;
 			bufferSize = bufzise;
 			mask = bufferSize - 1;
 		}
-
+	}
+	void reset() {
 		head = 0;
 		tail = 0;
 	}
@@ -141,13 +141,14 @@ public:
 	}
 
 
-
+	uint8_t		*buffer;
+	uint32_t	bufferSize;
 
 private:
-	uint8_t		*buffer;
+
 	uint32_t	head;
 	uint32_t	tail;
-	uint32_t	bufferSize;
+	
 	uint32_t	mask;
 	void copy_in(const uint8_t* pSrc, uint32_t len, uint32_t off)
 	{
