@@ -193,6 +193,9 @@ public:
 	uint8_t *m_original_rx_circular_buf;
 	uint8_t *m_original_rx_circular_buf_size;
 
+	uint32_t m_txrx_time_cost;
+	uint32_t m_tx_once;
+
 private:
 
 	bool getACK(){
@@ -255,8 +258,7 @@ private:
 	//rx status record
 	SD_USART_StatusTypeDef m_rx_status;
 
-	uint32_t m_txrx_time_cost;
-	uint32_t m_tx_once;
+
 
 	//
 	int m_totalTxFrames = 0;
