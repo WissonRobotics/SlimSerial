@@ -115,6 +115,9 @@ public:
 			uint8_t tx_method = 1,
 			uint8_t rx_enable = 1);
 
+	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
+
+	SD_USART_StatusTypeDef transmitDataLL(uint8_t *pdata,uint16_t dataBytes);
 
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
@@ -185,13 +188,13 @@ public:
 	SLIMSERIAL_PROXY_MODE m_proxy_mode; 
 	uint32_t m_last_baudrate;  
 	uint8_t *m_original_rx_pingpong_buf;
-	uint8_t *m_original_rx_pingpong_buf_half_size;
+	uint16_t m_original_rx_pingpong_buf_half_size;
  
 	uint8_t *m_original_rx_frame_buf;
-	uint8_t *m_original_rx_frame_buf_size;
+	uint16_t m_original_rx_frame_buf_size;
 
 	uint8_t *m_original_rx_circular_buf;
-	uint8_t *m_original_rx_circular_buf_size;
+	uint16_t m_original_rx_circular_buf_size;
 
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;

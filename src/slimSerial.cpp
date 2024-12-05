@@ -4,8 +4,7 @@
 #include "cmsis_os.h"
 #include <type_traits> 
 #include "slimRegister.h"
-
-
+#include "main.h"
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #if PRINTF_USART == huart1
@@ -1492,7 +1491,7 @@ void SlimSerial::restartRxFromISR(){
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
   
 	//direct enqueue without buffering to tx
-	SD_BUF_INFO sd_buf_info={pdata,databytes}; 
+	SD_BUF_INFO sd_buf_info={pData,databytes};
 
 	//enqueue the buffered data
 	m_tx_queue_meta.push(sd_buf_info);
@@ -1624,6 +1623,7 @@ void SlimSerial::disableProxy(){
 //0 for original baudrate
 void SlimSerial::setBaudrate(uint32_t baudrate){
 	if(baudrate!=m_last_baudrate){
+		uint32_t pclk;
 		UART_HandleTypeDef *huart = m_huart;
 		#if defined(USART6) && defined(UART9) && defined(UART10)
 			if ((huart->Instance == USART1) || (huart->Instance == USART6) || (huart->Instance == UART9) || (huart->Instance == UART10))
