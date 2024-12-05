@@ -176,12 +176,22 @@ public:
 
 	//proxy
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
-	void enableProxy(uint8_t proxy_port_index);
+	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate);
 	void disableProxy();
 	void ackProxy();
+	void setBaudrate(SlimSerial *pSerial,uint32_t baudrate=0);
 	SLIMSERIAL_PROXY_MODE getProxyMode();
 	SlimSerial *m_proxy_port;
 	SLIMSERIAL_PROXY_MODE m_proxy_mode; 
+	uint32_t m_last_baudrate;  
+	uint8_t *m_original_rx_pingpong_buf;
+	uint8_t *m_original_rx_pingpong_buf_half_size;
+ 
+	uint8_t *m_original_rx_frame_buf;
+	uint8_t *m_original_rx_frame_buf_size;
+
+	uint8_t *m_original_rx_circular_buf;
+	uint8_t *m_original_rx_circular_buf_size;
 
 private:
 
@@ -309,6 +319,7 @@ private:
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
+	SD_BUF_INFO queueTxData(uint8_t *pdata,uint16_t dataBytes);
   
 	//txrx task
 	uint32_t *txrxThreadID;

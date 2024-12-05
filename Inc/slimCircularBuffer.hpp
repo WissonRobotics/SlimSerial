@@ -32,7 +32,14 @@ public:
 		reset();
 	}
 
-	void reset() {
+	void reset(uint8_t *pBuf=NULL, uint16_t bufzise=0) {
+
+		if(pBuf){
+			buffer = pBuf;
+			bufferSize = bufzise;
+			mask = bufferSize - 1;
+		}
+
 		head = 0;
 		tail = 0;
 	}

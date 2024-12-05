@@ -10,7 +10,7 @@
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #if PRINTF_USART == huart1
-#define USART1_TX_QUEUE_SIZE 4
+#define USART1_TX_QUEUE_SIZE 2
 #else
 #define USART1_TX_QUEUE_SIZE 2
 #endif
@@ -31,7 +31,7 @@ SlimSerial slimSerial1(&huart1,
 #endif
 #if ENABLE_SLIMSERIAL_USART2==1
 #if PRINTF_USART == huart2
-#define USART2_TX_QUEUE_SIZE 4
+#define USART2_TX_QUEUE_SIZE 2
 #else
 #define USART2_TX_QUEUE_SIZE 2
 #endif
@@ -51,7 +51,7 @@ SlimSerial slimSerial2(&huart2,
 #endif
 #if ENABLE_SLIMSERIAL_USART3==1
 #if PRINTF_USART == huart3
-#define USART3_TX_QUEUE_SIZE 4
+#define USART3_TX_QUEUE_SIZE 2
 #else
 #define USART3_TX_QUEUE_SIZE 2
 #endif
@@ -71,7 +71,7 @@ SlimSerial slimSerial3(&huart3,
 #endif
 #if ENABLE_SLIMSERIAL_USART4==1
 #if PRINTF_USART == huart4
-#define USART4_TX_QUEUE_SIZE 4
+#define USART4_TX_QUEUE_SIZE 2
 #else
 #define USART4_TX_QUEUE_SIZE 2
 #endif
@@ -91,7 +91,7 @@ SlimSerial slimSerial4(&huart4,
 #endif
 #if ENABLE_SLIMSERIAL_USART5==1
 #if PRINTF_USART == huart5
-#define USART5_TX_QUEUE_SIZE 4
+#define USART5_TX_QUEUE_SIZE 2
 #else
 #define USART5_TX_QUEUE_SIZE 2
 #endif
@@ -111,7 +111,7 @@ SlimSerial slimSerial5(&huart5,
 #endif
 #if ENABLE_SLIMSERIAL_USART6==1
 #if PRINTF_USART == huart6
-#define USART6_TX_QUEUE_SIZE 4
+#define USART6_TX_QUEUE_SIZE 2
 #else
 #define USART6_TX_QUEUE_SIZE 2
 #endif
@@ -131,7 +131,7 @@ SlimSerial slimSerial6(&huart6,
 #endif
 #if ENABLE_SLIMSERIAL_USART7==1
 #if PRINTF_USART == huart7
-#define USART7_TX_QUEUE_SIZE 4
+#define USART7_TX_QUEUE_SIZE 2
 #else
 #define USART7_TX_QUEUE_SIZE 2
 #endif
@@ -151,7 +151,7 @@ SlimSerial slimSerial7(&huart7,
 #endif
 #if ENABLE_SLIMSERIAL_USART8==1
 #if PRINTF_USART == huart8
-#define USART8_TX_QUEUE_SIZE 4
+#define USART8_TX_QUEUE_SIZE 2
 #else
 #define USART8_TX_QUEUE_SIZE 2
 #endif
@@ -169,6 +169,10 @@ SlimSerial slimSerial8(&huart8,
 		USART8_TX_MODE,
 		USART8_RX_ENABLE);
 #endif
+ 
+std::array<uint8_t,1029*2> USART_PROXY_RX_PINGPONG_BUFFER;
+std::array<uint8_t,4096> USART_PROXY_RX_CIRCULAR_BUFFER;
+std::array<uint8_t,1029> USART_PROXY_RX_FRAME_BUFFER;
 
 
 inline constexpr uint16_t SLIM_SERIAL_TOTAL_NUM=(ENABLE_SLIMSERIAL_USART1+ENABLE_SLIMSERIAL_USART2+ENABLE_SLIMSERIAL_USART3+ENABLE_SLIMSERIAL_USART4+ENABLE_SLIMSERIAL_USART5+ENABLE_SLIMSERIAL_USART6+ENABLE_SLIMSERIAL_USART7+ENABLE_SLIMSERIAL_USART8);
@@ -346,6 +350,21 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
 	debugOutputEnable=1;
 
+	//proxy
+	m_proxy_port = NULL;
+	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
+ 	m_last_baudrate = 0;
+ 
+	m_original_rx_pingpong_buf = m_rx_pingpong_buf;
+	m_original_rx_pingpong_buf_half_size = m_rx_pingpong_buf_half_size;
+ 
+	m_original_rx_frame_buf = m_rx_frame_buf;
+	m_original_rx_frame_buf_size=m_rx_frame_buf_size;
+    
+ 
+	m_original_rx_circular_buf = m_rx_circular_buf.buffer;
+	m_original_rx_circular_buf_size = m_rx_circular_buf.bufferSize;
+
 
 	//init rx state
 	toggle485Tx(false);
@@ -491,6 +510,10 @@ SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 }
 
 
+
+
+
+
 void SlimSerial::addRxFrameCallback(std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)> &frameCallbackFunc){
 	m_frameCallbackFuncArray[m_frameCallbackFuncNumber++] = frameCallbackFunc;
 	m_frameCallbackFuncNumber_all++;
@@ -617,6 +640,28 @@ uint8_t SlimSerial::getRxFrameType(){
 //this function will be executed in an async thread
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
 
+	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+		return transmitFrameLL(address,fcode,payload,payloadBytes);
+	}
+	else{
+		return SD_USART_ERROR;
+	}
+}
+
+
+//this function will be executed in an async thread
+SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataBytes){
+	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+		return transmitDataLL(pdata,dataBytes);
+	}
+	else{
+		return SD_USART_ERROR;
+	}
+}
+
+//this function will be executed in an async thread
+SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
+
 	//assemble tx frame in internal buffer,not queued
 	SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payload,payloadBytes);
 
@@ -626,10 +671,8 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 	//enqueue and transmit
 	return transmitLL();
 }
-
-
 //this function will be executed in an async thread
-SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataBytes){
+SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBytes){
 
 	//buffer data into internal buffer, not queued
 	SD_BUF_INFO sd_buf_info=bufferTxData(pdata,dataBytes);
@@ -708,8 +751,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 		return SD_USART_ERROR;
 	}
 }
-
-
+ 
 
 SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t dataBytes) {
 	//next buffer bank
@@ -761,7 +803,11 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *p
 }
 
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,uint16_t timeout,bool frameTypeFilterOn){
-
+	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+		m_rx_status = SD_USART_ERROR;
+		m_rx_last.dataBytes=0;
+		return  m_rx_last;
+	}
 	//record txrx threadID
 	m_rx_status = SD_USART_BUSY;
 
@@ -816,7 +862,12 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,u
 
 
 SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes,uint16_t timeout){
-
+	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+		m_rx_status = SD_USART_ERROR;
+		m_rx_last.dataBytes=0;
+		return  m_rx_last;
+	}
+ 
 	//record txrx threadID
 	m_rx_status = SD_USART_BUSY;
 
@@ -1059,7 +1110,14 @@ void SlimSerial::rxHandlerThread() {
 											
 											if(funcodeIn == FUNC_ENABLE_PROXY){
 												//enable proxy
-												enableProxy(m_rx_last.pdata[5]);
+												uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
+												uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
+												enableProxy(proxyPortIndex_,proxyPortBaudrate_);
+												ackProxy();
+											}
+											else if(funcodeIn == FUNC_DISABLE_PROXY){
+												//should take no effect. Anyway, we respond to the request
+												disableProxy();
 												ackProxy();
 											}
 											else{
@@ -1128,7 +1186,7 @@ void SlimSerial::rxHandlerThread() {
 				 	m_rx_last.pdata[0]==0x5A &&
 					m_rx_last.pdata[1]==0xA5 &&
 					m_rx_last.pdata[2]==0x00 &&
-					m_rx_last.pdata[3]==0x07 &&
+					m_rx_last.pdata[3]==0x00 &&
 					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY)
 					){
 					uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
@@ -1433,10 +1491,18 @@ void SlimSerial::restartRxFromISR(){
 }
 
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
-	m_proxy_port->transmitData(pData,databytes);
+  
+	//direct enqueue without buffering to tx
+	SD_BUF_INFO sd_buf_info={pdata,databytes}; 
+
+	//enqueue the buffered data
+	m_tx_queue_meta.push(sd_buf_info);
+ 
+	m_proxy_port->transmitLL();
 }
+
 void SlimSerial::ackProxy(){
-	transmitFrame(0x00,FUNC_ACK_PROXY,NULL,0);
+	transmitFrameLL(0x00,FUNC_ACK_PROXY,NULL,0);
 }
  
 SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
@@ -1445,7 +1511,7 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
 }
 
-void SlimSerial::enableProxy(uint8_t proxy_port_index){
+void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate){
 	SlimSerial *proxy_port_;
 	switch(proxy_port_index){
 			#if ENABLE_SLIMSERIAL_USART1
@@ -1494,26 +1560,112 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index){
 		}
 
 
+
 	if(proxy_port_){
-		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){//stop previous proxy
+ 
+
+		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){//stop previous proxy chain
 			disableProxy();
 		}
+
+		//change settings of current serial port
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
-		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT;
+
+		//change rx buffer of current serial port to dedicated buffer
+		m_rx_circular_buf.reset(&USART_PROXY_RX_CIRCULAR_BUFFER[0],USART_PROXY_RX_CIRCULAR_BUFFER.size());
+		m_rx_pingpong_buf = &USART_PROXY_RX_PINGPONG_BUFFER[0];
+		m_rx_pingpong_buf_half_size = USART_PROXY_RX_PINGPONG_BUFFER.size()/2;
+		m_rx_pingpong_receiving_ind = 0;
+		m_rx_frame_buf =  &USART_PROXY_RX_FRAME_BUFFER[0];
+		m_rx_frame_buf_size = USART_PROXY_RX_FRAME_BUFFER.size();
+		m_rx_last.pdata = m_proxy_port->m_rx_frame_buf;
+		m_rx_last.dataBytes = 0;
+
+
+		//change settings of  proxy serial port		
 		m_proxy_port->m_proxy_port = this;
+		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT;
+
+		//change baudrate of  proxy serial port	
+		if(proxy_port_baudrate == 0 || proxy_port_baudrate==1000000 || proxy_port_baudrate==115200 || proxy_port_baudrate==921600){
+			m_proxy_port->setBaudrate(proxy_port_baudrate);
+		}
+
+ 
+
 	}
+
 }
 void SlimSerial::disableProxy(){
 	if(m_proxy_port!=NULL){
-		m_proxy_port->transmitFrame(0x00,FUNC_DISABLE_PROXY,NULL,0);//chain
+
+		//disable in chain
+		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY,NULL,0);
+
+		//restore baudrate if necessary
+		m_proxy_port->setBaudrate();
+
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 		m_proxy_port->m_proxy_port = NULL;
+
+		//restore rx buffer of current serial port
+		m_rx_circular_buf.reset(m_original_rx_circular_buf,m_original_rx_circular_buf_size);
+		m_rx_pingpong_buf = m_original_rx_pingpong_buf;
+		m_rx_pingpong_buf_half_size = m_original_rx_pingpong_buf_half_size;
+		m_rx_pingpong_receiving_ind = 0;
+		m_rx_frame_buf =  m_original_rx_frame_buf;
+		m_rx_frame_buf_size = m_original_rx_frame_buf_size;
+		m_rx_last.pdata = m_rx_frame_buf;
+		m_rx_last.dataBytes = 0;
 	}
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;
 }
-
+//0 for original baudrate
+void SlimSerial::setBaudrate(uint32_t baudrate){
+	if(baudrate!=m_last_baudrate){
+		UART_HandleTypeDef *huart = m_huart;
+		#if defined(USART6) && defined(UART9) && defined(UART10)
+			if ((huart->Instance == USART1) || (huart->Instance == USART6) || (huart->Instance == UART9) || (huart->Instance == UART10))
+			{
+			pclk = HAL_RCC_GetPCLK2Freq();
+			}
+		#elif defined(USART6)
+			if ((huart->Instance == USART1) || (huart->Instance == USART6))
+			{
+			pclk = HAL_RCC_GetPCLK2Freq();
+			}
+		#else
+			if (huart->Instance == USART1)
+			{
+			pclk = HAL_RCC_GetPCLK2Freq();
+			}
+		#endif /* USART6 */
+			else
+			{
+			pclk = HAL_RCC_GetPCLK1Freq();
+			}
+		/*-------------------------- USART BRR Configuration ---------------------*/
+	
+		m_last_baudrate = baudrate;
+		if(m_last_baudrate == 0){
+			baudrate = huart->Init.BaudRate;
+		}
+		__HAL_UART_DISABLE(huart);
+		if (huart->Init.OverSampling == UART_OVERSAMPLING_8)
+		{
+			huart->Instance->BRR = UART_BRR_SAMPLING8(pclk, baudrate);
+		}
+		else
+		{
+			huart->Instance->BRR = UART_BRR_SAMPLING16(pclk, baudrate);
+		}
+		__HAL_UART_ENABLE(huart);
+	}
+	
+  
+}
 
 
 
