@@ -119,6 +119,8 @@
 // #define HAL_TICK_TIM TIM6 //The timer used for HAL_Tick()
 // #endif
 
+// #define ENABLE_PROXY 0
+
 // //default Enable rx address filter
 
 // #define DEFAULT_RX_HEADER_1_BYTE1 0x5A
