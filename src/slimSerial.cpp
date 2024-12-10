@@ -2,8 +2,9 @@
 #include <slimSerial.h>
 #include "stdio.h"
 #include "cmsis_os.h"
-#include <type_traits> 
-#include "slimRegister.h"
+#include <type_traits>
+
+
 #include "main.h"
 
 #if ENABLE_SLIMSERIAL_USART1==1
@@ -167,11 +168,12 @@ SlimSerial slimSerial8(&huart8,
 		USART8_TX_MODE,
 		USART8_RX_ENABLE);
 #endif
- 
+
+#if ENABLE_PROXY==1
 std::array<uint8_t,1029*2> USART_PROXY_RX_PINGPONG_BUFFER;
 std::array<uint8_t,4096> USART_PROXY_RX_CIRCULAR_BUFFER;
 std::array<uint8_t,1029> USART_PROXY_RX_FRAME_BUFFER;
-
+#endif
 
 inline constexpr uint16_t SLIM_SERIAL_TOTAL_NUM=(ENABLE_SLIMSERIAL_USART1+ENABLE_SLIMSERIAL_USART2+ENABLE_SLIMSERIAL_USART3+ENABLE_SLIMSERIAL_USART4+ENABLE_SLIMSERIAL_USART5+ENABLE_SLIMSERIAL_USART6+ENABLE_SLIMSERIAL_USART7+ENABLE_SLIMSERIAL_USART8);
 
@@ -312,16 +314,13 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	//header whitelist    5A A5   or FF FF
 	addHeaderFilter(0x5A,0xA5);
 	addHeaderFilter(0xFF,0xFF);
-	toggleHeaderFilter(true);
+
 
 	//address whitelist. disabled by default
-	addAddressFilter(0xFF);
 	toggleAddressFilter(false);
-
 
 	//add funcode filter
-	addFuncodeFilter(0x00);
-	toggleAddressFilter(false);
+	toggleFuncodeFilter(false);
 
 	//
 	lengthFilterOn=true;
@@ -349,8 +348,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	debugOutputEnable=1;
 
 	//proxy
-	m_proxy_port = NULL;
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
+#if ENABLE_PROXY==1
+	m_proxy_port = NULL;
  	m_last_baudrate = 0;
  
 	m_original_rx_pingpong_buf = m_rx_pingpong_buf;
@@ -362,7 +362,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
  
 	m_original_rx_circular_buf = m_rx_circular_buf.buffer;
 	m_original_rx_circular_buf_size = m_rx_circular_buf.bufferSize;
-
+#endif
 
 	//init rx state
 	toggle485Tx(false);
@@ -533,10 +533,15 @@ void SlimSerial::addRxFrameCallback(void (*frameCallbackFunc)(SlimSerial *,uint8
 void SlimSerial::addHeaderFilter(uint8_t h1,uint8_t h2){
 	 headerFilter[headerFilter_num][0]=h1;
 	 headerFilter[headerFilter_num][1]=h2;
-	 if(headerFilter_num<SLIMSERIAL_HEADER_FILTER_MAX_LEN-1){
+	 if(headerFilter_num<SLIMSERIAL_HEADER_FILTER_MAX_LEN){
 		 headerFilter_num++;
 	 }
+	 toggleHeaderFilter(true);
 }
+void SlimSerial::toggleHeaderFilter(bool filterOn){
+	headerFilterOn = filterOn;
+}
+
 bool SlimSerial::applyHeaderFilter(uint8_t h1In,uint8_t h2In){
 	if(!headerFilterOn)
 		return true;
@@ -547,25 +552,24 @@ bool SlimSerial::applyHeaderFilter(uint8_t h1In,uint8_t h2In){
 	}
 	return false;
 }
-void SlimSerial::toggleHeaderFilter(bool filterOn){
-	headerFilterOn = filterOn;
-}
 
 
 
 void SlimSerial::addAddressFilter(uint8_t address){
 	 addressFilter[addressFilter_num]=address;
-	 if(addressFilter_num<SLIMSERIAL_ADDRESS_FILTER_MAX_LEN-1){
+	 if(addressFilter_num<SLIMSERIAL_ADDRESS_FILTER_MAX_LEN){
 		 addressFilter_num++;
 	 }
+	 toggleAddressFilter(true);
+}
+void SlimSerial::toggleAddressFilter(bool filterOn){
+	addressFilterOn = filterOn;
 }
 bool SlimSerial::applyAddressFilter(uint8_t addressIn){
 	if(!addressFilterOn)
 		return true;
 
 	/*add custom address filter here*/
-
-
 
 	//internal address whitelist
 	for(int i=0;i<addressFilter_num;i++){
@@ -577,16 +581,16 @@ bool SlimSerial::applyAddressFilter(uint8_t addressIn){
 }
 
 
-void SlimSerial::toggleAddressFilter(bool filterOn){
-	addressFilterOn = filterOn;
-}
-
 
 void SlimSerial::addFuncodeFilter(uint8_t funcodeIn){
 	funcodeFilter[funcodeFilter_num]=funcodeIn;
-		 if(funcodeFilter_num<SLIMSERIAL_FUNCODE_FILTER_MAX_LEN-1){
+		 if(funcodeFilter_num<SLIMSERIAL_FUNCODE_FILTER_MAX_LEN){
 			 funcodeFilter_num++;
 		 }
+		 toggleFuncodeFilter(true);
+}
+void SlimSerial::toggleFuncodeFilter(bool filterOn){
+	funcodeFilterOn = filterOn;
 }
 bool SlimSerial::applyFuncodeFilter(uint8_t funcodeIn){
 	if(!funcodeFilterOn)
@@ -604,9 +608,7 @@ bool SlimSerial::applyFuncodeFilter(uint8_t funcodeIn){
 
 	return false;
 }
-void SlimSerial::toggleFuncodeFilter(bool filterOn){
-	funcodeFilterOn = filterOn;
-}
+
 
 //void SlimSerial::toggle485Tx(bool txOn){
 //	if(Tx_EN_Port)
@@ -1055,7 +1057,7 @@ void SlimSerial::rxHandlerThread() {
 			}
 
 			m_rx_status = SD_USART_OK;
-			continue;
+
 		}
 		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
 			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
@@ -1105,7 +1107,7 @@ void SlimSerial::rxHandlerThread() {
 											receivedACK = true;
 
 											m_totalRxFrames++;
-											
+#if ENABLE_PROXY==1
 											if(funcodeIn == FUNC_ENABLE_PROXY){
 												//enable proxy
 												uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
@@ -1119,6 +1121,7 @@ void SlimSerial::rxHandlerThread() {
 												ackProxy();
 											}
 											else{
+#endif
 												callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 													//notify potential txrx thread
 												if (txrxThreadID != NULL) {
@@ -1127,13 +1130,15 @@ void SlimSerial::rxHandlerThread() {
 
 												m_rx_status = SD_USART_OK;
 												continue;
+#if ENABLE_PROXY==1
 											}
+#endif
 										}
 
 										else {
 											//bad crc
-											m_rx_circular_buf.out(1);
-											remainingBytes--;
+						                      int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+						                      remainingBytes -= discardN;
 											m_rx_status = SD_USART_ERROR;
 											continue;
 										}
@@ -1146,34 +1151,35 @@ void SlimSerial::rxHandlerThread() {
 									}
 								}
 								else{//invalid length
-									m_rx_circular_buf.out(1);
-									remainingBytes--;
+									int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+									remainingBytes -= discardN;
 									m_rx_status = SD_USART_ERROR;
 									continue;
 								}
 							}
 							else{//invalid funcode
-								m_rx_circular_buf.out(1);
-								remainingBytes--;
+								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+								remainingBytes -= discardN;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
 						}
 						else{//invalid address
-							m_rx_circular_buf.out(1);
-							remainingBytes--;
+							int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+							remainingBytes -= discardN;
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
 					} else {//invalid header
-						m_rx_circular_buf.out(1);
-						remainingBytes--;
+						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+						remainingBytes -= discardN;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
 
 				}
 			}
+#if ENABLE_PROXY==1
 			else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
 				m_rx_circular_buf.out(m_rx_last.pdata, remainingBytes);
 				m_rx_last.dataBytes = remainingBytes;
@@ -1199,6 +1205,7 @@ void SlimSerial::rxHandlerThread() {
 					proxyDelegateMessage(m_rx_last.pdata, m_rx_last.dataBytes);
 				}
 			}
+#endif
 		}
 		else if (m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_2){
 			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
@@ -1257,8 +1264,8 @@ void SlimSerial::rxHandlerThread() {
 
 							else {
 								//bad crc
-								m_rx_circular_buf.out(1);
-								remainingBytes--;
+								int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
+								remainingBytes -= discardN;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
@@ -1271,15 +1278,15 @@ void SlimSerial::rxHandlerThread() {
 						}
 					}
 					else{//invalid length
-						m_rx_circular_buf.out(1);
-						remainingBytes--;
+						int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
+						remainingBytes -= discardN;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
 
 				} else {//invalid header
-					m_rx_circular_buf.out(1);
-					remainingBytes--;
+					int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
+					remainingBytes -= discardN;
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
@@ -1353,13 +1360,13 @@ void SlimSerial::rxHandlerThread() {
 								}
 								else{
 								  int discardN = m_rx_circular_buf.availableData();
-								  m_rx_circular_buf.out(discardN);
+								  m_rx_circular_buf.discardN(discardN);
 								  remainingBytes -= discardN;
 
 								  continue;
 								}
 
-								m_rx_circular_buf.out(1);
+								m_rx_circular_buf.discardN(1);
 								remainingBytes--;
 								m_rx_status = SD_USART_ERROR;
 								continue;
@@ -1370,7 +1377,7 @@ void SlimSerial::rxHandlerThread() {
 		            }
 				} else {
 					//bad funcode
-					m_rx_circular_buf.out(1);
+					m_rx_circular_buf.discardN(1);
 					remainingBytes--;
 					m_rx_status = SD_USART_ERROR;
 					continue;
@@ -1448,7 +1455,7 @@ void SlimSerial::rxHandlerThread() {
 								}
 								else{
 								  int discardN = m_rx_circular_buf.availableData();
-								  m_rx_circular_buf.out(discardN);
+								  m_rx_circular_buf.discardN(discardN);
 								  remainingBytes -= discardN;
 
 								  continue;
@@ -1461,7 +1468,7 @@ void SlimSerial::rxHandlerThread() {
 					}
 					else {
 						//bad funcode
-						m_rx_circular_buf.out(1);
+						m_rx_circular_buf.discardN(1);
 						remainingBytes--;
 						m_rx_status = SD_USART_ERROR;
 						continue;
@@ -1488,6 +1495,12 @@ void SlimSerial::restartRxFromISR(){
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
+SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
+
+    return m_proxy_mode;
+
+}
+#if ENABLE_PROXY==1
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
   
 	//direct enqueue without buffering to tx
@@ -1503,11 +1516,7 @@ void SlimSerial::ackProxy(){
 	transmitFrameLL(0x00,FUNC_ACK_PROXY,NULL,0);
 }
  
-SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
-    return m_proxy_mode;
-
-}
 
 void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate){
 	SlimSerial *proxy_port_;
@@ -1665,7 +1674,7 @@ void SlimSerial::setBaudrate(uint32_t baudrate){
 	
   
 }
-
+#endif
 
 
 

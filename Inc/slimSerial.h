@@ -178,14 +178,17 @@ public:
 	void restartRxFromISR();
 
 	//proxy
+	SLIMSERIAL_PROXY_MODE getProxyMode();
+	SLIMSERIAL_PROXY_MODE m_proxy_mode;
+#if ENABLE_PROXY==1
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate);
 	void disableProxy();
 	void ackProxy();
 	void setBaudrate(uint32_t baudrate=0);
-	SLIMSERIAL_PROXY_MODE getProxyMode();
+
 	SlimSerial *m_proxy_port;
-	SLIMSERIAL_PROXY_MODE m_proxy_mode; 
+
 	uint32_t m_last_baudrate;  
 	uint8_t *m_original_rx_pingpong_buf;
 	uint16_t m_original_rx_pingpong_buf_half_size;
@@ -195,7 +198,7 @@ public:
 
 	uint8_t *m_original_rx_circular_buf;
 	uint16_t m_original_rx_circular_buf_size;
-
+#endif
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;
 

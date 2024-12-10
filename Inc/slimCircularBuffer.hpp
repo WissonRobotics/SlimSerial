@@ -44,27 +44,13 @@ public:
 		tail = 0;
 	}
 
-	uint32_t out(uint8_t* pDes, uint32_t len) {
-		uint32_t peekedLen = peek(pDes, len);
-		tail += peekedLen;
-
-		return peekedLen;
+	uint32_t availableData() {
+		return (uint32_t)(head - tail);
 	}
 
-	uint32_t out(uint32_t len) {
 
-		uint32_t ltemp = availableData();
 
-		len = (len > ltemp) ? ltemp : len;
 
-		tail += len;
-
-		return len;
-	}
-
-	inline uint8_t peekAt(uint32_t index) {
-		return buffer[(tail + index) & mask];
-	}
 
 	uint32_t peek(uint8_t* pDes, uint32_t len) {
 		uint32_t ltemp;
@@ -77,7 +63,14 @@ public:
 
 		return len;
 	}
+	inline uint8_t peekAt(uint32_t index) {
+		return buffer[(tail + index) & mask];
+	}
 
+	uint16_t peekAt_U16(int index){
+		return (uint16_t)((uint16_t)(peekAt(index)) | (uint16_t)((uint16_t)(peekAt(index + 1) << 8)));
+
+	}
 	uint32_t in(const uint8_t* pSrc, uint32_t len) {
 		uint32_t ltemp = unusedSpace();
 		len = (len > ltemp) ? ltemp : len;
@@ -86,23 +79,52 @@ public:
 		head += len;
 		return len;
 	}
+	uint32_t out(uint8_t* pDes, uint32_t len) {
+		uint32_t peekedLen = peek(pDes, len);
+		tail += peekedLen;
 
-	uint32_t in_overwrite(const uint8_t* pSrc, uint32_t len) {
-		uint32_t ltemp = unusedSpace();
+		return peekedLen;
+	}
+
+	uint32_t discardN(uint32_t len)
+	{
+		if (len == 0) {
+			return 0;
+		}
 
 
-		copy_in( pSrc, len, head);
-		head += len;
+		uint32_t ltemp;
 
-		uint32_t loverflow = (len > ltemp) ? len - ltemp : 0;
-		tail += loverflow;
+		ltemp = availableData();
+
+		len = (len > ltemp) ? ltemp : len;
+
+		tail += len;
 
 		return len;
 	}
 
-	uint32_t availableData() {
-		return (uint32_t)(head - tail);
+	uint32_t discardUntilNext(uint8_t targetChar)
+	{
+		int allbytes = availableData();
+
+		if (allbytes == 0) {
+			return 0;
+		}
+
+		for (int i = 0; i < allbytes; i++) {
+			if (targetChar == peekAt(i)) {
+				if (i == 0)//ignore the current char
+					continue;
+				discardN(i);
+				return (i);
+			}
+		}
+		discardN(allbytes);
+		return allbytes;
 	}
+
+
 
 	inline uint32_t unusedSpace() {
 		return (uint32_t)(bufferSize - (head - tail));
@@ -135,10 +157,7 @@ public:
 
 	}
 
-	uint16_t peekAt_U16(int index){
-		return (uint16_t)((uint16_t)(peekAt(index)) | (uint16_t)((uint16_t)(peekAt(index + 1) << 8)));
 
-	}
 
 
 	uint8_t		*buffer;
@@ -150,6 +169,20 @@ private:
 	uint32_t	tail;
 	
 	uint32_t	mask;
+
+	uint32_t in_overwrite(const uint8_t* pSrc, uint32_t len) {
+		uint32_t ltemp = unusedSpace();
+
+
+		copy_in( pSrc, len, head);
+		head += len;
+
+		uint32_t loverflow = (len > ltemp) ? len - ltemp : 0;
+		tail += loverflow;
+
+		return len;
+	}
+
 	void copy_in(const uint8_t* pSrc, uint32_t len, uint32_t off)
 	{
 
