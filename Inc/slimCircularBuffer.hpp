@@ -31,18 +31,17 @@ public:
 
 		reset();
 	}
-	void reset(uint8_t *pBuf, uint16_t bufzise) {
+	void reset(uint8_t *pBuf=NULL, uint16_t bufzise=0) {
 
 		if(pBuf){
 			buffer = pBuf;
 			bufferSize = bufzise;
 			mask = bufferSize - 1;
 		}
-	}
-	void reset() {
 		head = 0;
 		tail = 0;
 	}
+ 
 
 	uint32_t availableData() {
 		return (uint32_t)(head - tail);

@@ -3,7 +3,7 @@
 #include "stdio.h"
 #include "cmsis_os.h"
 #include <type_traits>
-
+#include "slimRegister.h"
 
 #include "main.h"
 
@@ -1031,13 +1031,14 @@ void SlimSerial::rxHandlerThread() {
 		if(rxNeedRestart){
 			rxNeedRestart=0;
 			start_Rx_DMA_Idle();
+			continue;
 		}
 
-		//un
-		if (!(ulTaskNotifyRet && m_rx_pingpong_last.dataBytes>0))
-			continue;
+		uint32_t remainingBytes=m_rx_circular_buf.availableData();
 
-		uint16_t remainingBytes=m_rx_circular_buf.availableData();
+		//un
+		if (!(ulTaskNotifyRet && remainingBytes>0))
+			continue;
 
 		if(m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_0_ANY){
 
@@ -1110,10 +1111,12 @@ void SlimSerial::rxHandlerThread() {
 #if ENABLE_PROXY==1
 											if(funcodeIn == FUNC_ENABLE_PROXY){
 												//enable proxy
-												uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
-												uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
-												enableProxy(proxyPortIndex_,proxyPortBaudrate_);
-												ackProxy();
+												if(m_rx_last.dataBytes==12){
+													uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
+													uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
+													enableProxy(proxyPortIndex_,proxyPortBaudrate_);
+												}
+
 											}
 											else if(funcodeIn == FUNC_DISABLE_PROXY){
 												//should take no effect. Anyway, we respond to the request
@@ -1202,6 +1205,7 @@ void SlimSerial::rxHandlerThread() {
 					}
 				}
 				else{
+
 					proxyDelegateMessage(m_rx_last.pdata, m_rx_last.dataBytes);
 				}
 			}
@@ -1507,7 +1511,7 @@ void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 	SD_BUF_INFO sd_buf_info={pData,databytes};
 
 	//enqueue the buffered data
-	m_tx_queue_meta.push(sd_buf_info);
+	m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
  
 	m_proxy_port->transmitLL();
 }
@@ -1519,7 +1523,7 @@ void SlimSerial::ackProxy(){
 
 
 void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate){
-	SlimSerial *proxy_port_;
+	SlimSerial *proxy_port_=NULL;
 	switch(proxy_port_index){
 			#if ENABLE_SLIMSERIAL_USART1
 			case 1:
@@ -1567,28 +1571,34 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		}
 
 
-
+	//fail if already previous proxy chain
 	if(proxy_port_){
- 
 
-		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){//stop previous proxy chain
+		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){
 			disableProxy();
 		}
+
+		ackProxy();
+
+ 		HAL_Delay(1);
 
 		//change settings of current serial port
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
 
-		//change rx buffer of current serial port to dedicated buffer
-		m_rx_circular_buf.reset(&USART_PROXY_RX_CIRCULAR_BUFFER[0],USART_PROXY_RX_CIRCULAR_BUFFER.size());
-		m_rx_pingpong_buf = &USART_PROXY_RX_PINGPONG_BUFFER[0];
-		m_rx_pingpong_buf_half_size = USART_PROXY_RX_PINGPONG_BUFFER.size()/2;
-		m_rx_pingpong_receiving_ind = 0;
-		m_rx_frame_buf =  &USART_PROXY_RX_FRAME_BUFFER[0];
-		m_rx_frame_buf_size = USART_PROXY_RX_FRAME_BUFFER.size();
-		m_rx_last.pdata = m_proxy_port->m_rx_frame_buf;
-		m_rx_last.dataBytes = 0;
+//		//change rx buffer of current serial port to dedicated buffer
+//		m_rx_circular_buf.reset(&USART_PROXY_RX_CIRCULAR_BUFFER[0],USART_PROXY_RX_CIRCULAR_BUFFER.size());
+//		m_rx_pingpong_buf = &USART_PROXY_RX_PINGPONG_BUFFER[0];
+//		m_rx_pingpong_buf_half_size = USART_PROXY_RX_PINGPONG_BUFFER.size()/2;
+//		m_rx_pingpong_receiving_ind = 0;
+//		m_rx_frame_buf =  &USART_PROXY_RX_FRAME_BUFFER[0];
+//		m_rx_frame_buf_size = USART_PROXY_RX_FRAME_BUFFER.size();
+//		m_rx_last.pdata = &USART_PROXY_RX_FRAME_BUFFER[0];
+//		m_rx_last.dataBytes = 0;
 
+		 /* Configure DMA Stream immediately */
+//		m_huart->hdmarx->Instance->NDTR = m_rx_pingpong_buf_half_size;
+//		m_huart->hdmarx->Instance->M0AR = *(uint32_t*)(&m_rx_pingpong_buf);
 
 		//change settings of  proxy serial port		
 		m_proxy_port->m_proxy_port = this;
@@ -1599,16 +1609,26 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 			m_proxy_port->setBaudrate(proxy_port_baudrate);
 		}
 
- 
+
+//		rxNeedRestart=1;
+//		if (rxThreadID != NULL) {
+//			xTaskNotify((TaskHandle_t)(rxThreadID), 1, eSetValueWithOverwrite);
+//		}
 
 	}
 
 }
 void SlimSerial::disableProxy(){
+
+
 	if(m_proxy_port!=NULL){
 
 		//disable in chain
+		ackProxy();
+ 		HAL_Delay(2);
+
 		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY,NULL,0);
+		HAL_Delay(10);
 
 		//restore baudrate if necessary
 		m_proxy_port->setBaudrate();
@@ -1617,18 +1637,28 @@ void SlimSerial::disableProxy(){
 		m_proxy_port->m_proxy_port = NULL;
 
 		//restore rx buffer of current serial port
-		m_rx_circular_buf.reset(m_original_rx_circular_buf,m_original_rx_circular_buf_size);
-		m_rx_pingpong_buf = m_original_rx_pingpong_buf;
-		m_rx_pingpong_buf_half_size = m_original_rx_pingpong_buf_half_size;
-		m_rx_pingpong_receiving_ind = 0;
-		m_rx_frame_buf =  m_original_rx_frame_buf;
-		m_rx_frame_buf_size = m_original_rx_frame_buf_size;
-		m_rx_last.pdata = m_rx_frame_buf;
-		m_rx_last.dataBytes = 0;
+//		m_rx_circular_buf.reset(m_original_rx_circular_buf,m_original_rx_circular_buf_size);
+//		m_rx_pingpong_buf = m_original_rx_pingpong_buf;
+//		m_rx_pingpong_buf_half_size = m_original_rx_pingpong_buf_half_size;
+//		m_rx_pingpong_receiving_ind = 0;
+//		m_rx_frame_buf =  m_original_rx_frame_buf;
+//		m_rx_frame_buf_size = m_original_rx_frame_buf_size;
+//		m_rx_last.pdata = m_original_rx_frame_buf;
+//		m_rx_last.dataBytes = 0;
+
+//		m_huart->hdmarx->Instance->NDTR = m_rx_pingpong_buf_half_size;
+//		m_huart->hdmarx->Instance->M0AR = *(uint32_t*)(&m_rx_pingpong_buf);
+
+//		rxNeedRestart=1;
+//		if (rxThreadID != NULL) {
+//			xTaskNotify((TaskHandle_t)(rxThreadID), 1, eSetValueWithOverwrite);
+//		}
 	}
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;
 }
+
+
 //0 for original baudrate
 void SlimSerial::setBaudrate(uint32_t baudrate){
 	if(baudrate!=m_last_baudrate){
