@@ -153,6 +153,7 @@ public:
     		HAL_GPIO_WritePin(Tx_EN_Port,Tx_EN_Pin,(txOn?GPIO_PIN_SET:GPIO_PIN_RESET));
     }
 
+	uint32_t getRxIdleTimeUs();
 
 	int8_t debugOutputEnable;
 
@@ -163,6 +164,7 @@ public:
 	uint32_t m_rx_time_start;
 	uint32_t m_rx_time_end;
 	uint32_t m_rx_time_cost;
+	uint32_t m_rx_time_validFrame;
 
 	//tx time record
 	uint32_t m_tx_time_start;

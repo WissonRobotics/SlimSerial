@@ -1049,6 +1049,7 @@ void SlimSerial::rxHandlerThread() {
 			receivedACK = true;
 
 			m_totalRxFrames++;
+			m_rx_time_validFrame = currentTime_us();
 
 			callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1108,6 +1109,8 @@ void SlimSerial::rxHandlerThread() {
 											receivedACK = true;
 
 											m_totalRxFrames++;
+
+											m_rx_time_validFrame = currentTime_us();
 #if ENABLE_PROXY==1
 											if(funcodeIn == FUNC_ENABLE_PROXY){
 												//enable proxy
@@ -1251,6 +1254,7 @@ void SlimSerial::rxHandlerThread() {
 								receivedACK = true;
 
 								m_totalRxFrames++;
+								m_rx_time_validFrame = currentTime_us();
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1341,6 +1345,7 @@ void SlimSerial::rxHandlerThread() {
 								receivedACK = true;
 
 								m_totalRxFrames++;
+								m_rx_time_validFrame = currentTime_us();
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1436,6 +1441,7 @@ void SlimSerial::rxHandlerThread() {
 								receivedACK = true;
 
 								m_totalRxFrames++;
+								m_rx_time_validFrame = currentTime_us();
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1490,6 +1496,11 @@ void SlimSerial::rxHandlerThread() {
 
 	}
 }
+
+uint32_t SlimSerial::getRxIdleTimeUs(){
+	return currentTime_us()- m_rx_time_end;
+}
+
 
 
 void SlimSerial::restartRxFromISR(){
