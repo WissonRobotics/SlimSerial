@@ -3,7 +3,8 @@
 #include "stdio.h"
 #include "cmsis_os.h"
 #include <type_traits>
-#include "slimRegister.h"
+
+
 
 #include "main.h"
 
@@ -1112,7 +1113,7 @@ void SlimSerial::rxHandlerThread() {
 
 											m_rx_time_validFrame = currentTime_us();
 #if ENABLE_PROXY==1
-											if(funcodeIn == FUNC_ENABLE_PROXY){
+											if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
 												//enable proxy
 												if(m_rx_last.dataBytes==12){
 													uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
@@ -1121,7 +1122,7 @@ void SlimSerial::rxHandlerThread() {
 												}
 
 											}
-											else if(funcodeIn == FUNC_DISABLE_PROXY){
+											else if(funcodeIn == FUNC_DISABLE_PROXY_INTERNAL){
 												//should take no effect. Anyway, we respond to the request
 												disableProxy();
 												ackProxy();
@@ -1191,13 +1192,13 @@ void SlimSerial::rxHandlerThread() {
 				m_rx_last.dataBytes = remainingBytes;
 				m_totalRxFrames++;
 
-				//in transparent mode, only check FUNC_DISABLE_PROXY to disable proxy
+				//in transparent mode, only check FUNC_DISABLE_PROXY_INTERNAL to disable proxy
 				if( m_rx_last.dataBytes>=7 &&
 				 	m_rx_last.pdata[0]==0x5A &&
 					m_rx_last.pdata[1]==0xA5 &&
 					m_rx_last.pdata[2]==0x00 &&
 					m_rx_last.pdata[3]==0x00 &&
-					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY)
+					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY_INTERNAL)
 					){
 					uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
 					uint16_t crc2 = m_rx_last.pdata[5] | ((uint16_t)m_rx_last.pdata[6])<<8 ;
@@ -1530,7 +1531,7 @@ void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 }
 
 void SlimSerial::ackProxy(){
-	transmitFrameLL(0x00,FUNC_ACK_PROXY,NULL,0);
+	transmitFrameLL(0x00,FUNC_ACK_PROXY_INTERNAL,NULL,0);
 }
  
 
@@ -1640,7 +1641,7 @@ void SlimSerial::disableProxy(){
 		ackProxy();
  		HAL_Delay(2);
 
-		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY,NULL,0);
+		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY_INTERNAL,NULL,0);
 		HAL_Delay(10);
 
 		//restore baudrate if necessary
