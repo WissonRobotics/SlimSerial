@@ -154,6 +154,7 @@ public:
     }
 
 	uint32_t getRxIdleTimeUs();
+	uint32_t getRxFrameIdleTimeUs();
 
 	int8_t debugOutputEnable;
 

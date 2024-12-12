@@ -1500,7 +1500,9 @@ void SlimSerial::rxHandlerThread() {
 uint32_t SlimSerial::getRxIdleTimeUs(){
 	return currentTime_us()- m_rx_time_end;
 }
-
+uint32_t SlimSerial::getRxFrameIdleTimeUs(){
+	return currentTime_us()- m_rx_time_validFrame;
+}
 
 
 void SlimSerial::restartRxFromISR(){
