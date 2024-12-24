@@ -349,6 +349,8 @@ private:
 	uint32_t *rxThreadID;
 	osThreadId rxTaskHandle;
 
+	int32_t m_parse_remainingBytes;
+
 	HAL_StatusTypeDef Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
 
 

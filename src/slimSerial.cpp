@@ -1035,17 +1035,17 @@ void SlimSerial::rxHandlerThread() {
 			continue;
 		}
 
-		uint32_t remainingBytes=m_rx_circular_buf.availableData();
+		m_parse_remainingBytes=m_rx_circular_buf.availableData();
 
 		//un
-		if (!(ulTaskNotifyRet && remainingBytes>0))
+		if (!(ulTaskNotifyRet && m_parse_remainingBytes>0))
 			continue;
 
 		if(m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_0_ANY){
 
-			m_rx_circular_buf.out(m_rx_last.pdata, remainingBytes);
+			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
 
-			m_rx_last.dataBytes = remainingBytes;
+			m_rx_last.dataBytes = m_parse_remainingBytes;
 
 			receivedACK = true;
 
@@ -1068,7 +1068,7 @@ void SlimSerial::rxHandlerThread() {
 			//Header1 + Header2 + Src + dataBytes +  Funcode  + data + crc16
 			// dataBytes =   sizeof(data)
 			if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
-				while (remainingBytes >= 7) {
+				while (m_parse_remainingBytes >= 7) {
 
 					//check header, current support 5A A5 and FF FF
 					uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
@@ -1088,12 +1088,12 @@ void SlimSerial::rxHandlerThread() {
 									expectedFrameBytes = m_rx_circular_buf.peekAt(3) + 7;
 								}
 								else{
-									expectedFrameBytes=remainingBytes;
+									expectedFrameBytes=m_parse_remainingBytes;
 								}
 								//check length
 								if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
 
-									if (expectedFrameBytes <= remainingBytes) {
+									if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 										//valid CRC
 										uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
@@ -1104,7 +1104,7 @@ void SlimSerial::rxHandlerThread() {
 											//read out one valid frame from ring buffer to m_rx_last
 											m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
 											m_rx_last.dataBytes = expectedFrameBytes;
-											remainingBytes -= expectedFrameBytes;
+											m_parse_remainingBytes -= expectedFrameBytes;
 											//process frame
 
 											receivedACK = true;
@@ -1145,7 +1145,7 @@ void SlimSerial::rxHandlerThread() {
 										else {
 											//bad crc
 						                      int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-						                      remainingBytes -= discardN;
+						                      m_parse_remainingBytes -= discardN;
 											m_rx_status = SD_USART_ERROR;
 											continue;
 										}
@@ -1159,27 +1159,27 @@ void SlimSerial::rxHandlerThread() {
 								}
 								else{//invalid length
 									int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-									remainingBytes -= discardN;
+									m_parse_remainingBytes -= discardN;
 									m_rx_status = SD_USART_ERROR;
 									continue;
 								}
 							}
 							else{//invalid funcode
 								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-								remainingBytes -= discardN;
+								m_parse_remainingBytes -= discardN;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
 						}
 						else{//invalid address
 							int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-							remainingBytes -= discardN;
+							m_parse_remainingBytes -= discardN;
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
 					} else {//invalid header
 						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-						remainingBytes -= discardN;
+						m_parse_remainingBytes -= discardN;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
@@ -1188,8 +1188,8 @@ void SlimSerial::rxHandlerThread() {
 			}
 #if ENABLE_PROXY==1
 			else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-				m_rx_circular_buf.out(m_rx_last.pdata, remainingBytes);
-				m_rx_last.dataBytes = remainingBytes;
+				m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
+				m_rx_last.dataBytes = m_parse_remainingBytes;
 				m_totalRxFrames++;
 
 				//in transparent mode, only check FUNC_DISABLE_PROXY_INTERNAL to disable proxy
@@ -1221,7 +1221,7 @@ void SlimSerial::rxHandlerThread() {
 			//2+N+2
 			//Header1 + Header2 + databytes + data + crc16
 			//databytes = 1 + sizeof(data)
-			while (remainingBytes >= 4) {
+			while (m_parse_remainingBytes >= 4) {
 
 				//check header, current support 5A A5 and FF FF
 				uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
@@ -1233,12 +1233,12 @@ void SlimSerial::rxHandlerThread() {
 						expectedFrameBytes = m_rx_circular_buf.peekAt(2) + 4;
 					}
 					else{
-						expectedFrameBytes=remainingBytes;
+						expectedFrameBytes=m_parse_remainingBytes;
 					}
 					//check length
 					if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
 
-						if (expectedFrameBytes <= remainingBytes) {
+						if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 							//valid CRC
 							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
@@ -1249,7 +1249,7 @@ void SlimSerial::rxHandlerThread() {
 								//read out one valid frame from ring buffer to m_rx_last
 								m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
 								m_rx_last.dataBytes = expectedFrameBytes;
-								remainingBytes -= expectedFrameBytes;
+								m_parse_remainingBytes -= expectedFrameBytes;
 								//process frame
 
 								receivedACK = true;
@@ -1274,7 +1274,7 @@ void SlimSerial::rxHandlerThread() {
 							else {
 								//bad crc
 								int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-								remainingBytes -= discardN;
+								m_parse_remainingBytes -= discardN;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
@@ -1288,14 +1288,14 @@ void SlimSerial::rxHandlerThread() {
 					}
 					else{//invalid length
 						int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-						remainingBytes -= discardN;
+						m_parse_remainingBytes -= discardN;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
 
 				} else {//invalid header
 					int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-					remainingBytes -= discardN;
+					m_parse_remainingBytes -= discardN;
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
@@ -1307,7 +1307,7 @@ void SlimSerial::rxHandlerThread() {
 
 			//modbus frame
 			//src + funcode + data + crc16
-			while (remainingBytes >= 8) {
+			while (m_parse_remainingBytes >= 8) {
 
 				//check address. disabled by default
 				//uint8_t addressIn = m_rx_circular_buf.peekAt(0);
@@ -1330,7 +1330,7 @@ void SlimSerial::rxHandlerThread() {
 					}
 
 		            // got enough rx bytes
-		            if (remainingBytes >= expectedFrameBytes) {
+		            if (m_parse_remainingBytes >= expectedFrameBytes) {
 							//valid CRC
 							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
 							uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
@@ -1340,7 +1340,7 @@ void SlimSerial::rxHandlerThread() {
 								//read out one valid frame from ring buffer to m_rx_last
 								m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
 								m_rx_last.dataBytes = expectedFrameBytes;
-								remainingBytes -= expectedFrameBytes;
+								m_parse_remainingBytes -= expectedFrameBytes;
 								//process frame
 
 								receivedACK = true;
@@ -1371,13 +1371,13 @@ void SlimSerial::rxHandlerThread() {
 								else{
 								  int discardN = m_rx_circular_buf.availableData();
 								  m_rx_circular_buf.discardN(discardN);
-								  remainingBytes -= discardN;
+								  m_parse_remainingBytes -= discardN;
 
 								  continue;
 								}
 
 								m_rx_circular_buf.discardN(1);
-								remainingBytes--;
+								m_parse_remainingBytes--;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
@@ -1388,7 +1388,7 @@ void SlimSerial::rxHandlerThread() {
 				} else {
 					//bad funcode
 					m_rx_circular_buf.discardN(1);
-					remainingBytes--;
+					m_parse_remainingBytes--;
 					m_rx_status = SD_USART_ERROR;
 					continue;
 
@@ -1401,7 +1401,7 @@ void SlimSerial::rxHandlerThread() {
 
 				//modbus frame
 				//src + funcode + data + crc16
-				while (remainingBytes >= 5) {
+				while (m_parse_remainingBytes >= 5) {
 
 					//check address. disabled by default
 					//uint8_t addressIn = m_rx_circular_buf.peekAt(0);
@@ -1426,7 +1426,7 @@ void SlimSerial::rxHandlerThread() {
 							expectedFrameBytes = 5;//error reply frame
 						}
 
-						 if (remainingBytes >= expectedFrameBytes) {
+						 if (m_parse_remainingBytes >= expectedFrameBytes) {
 							//valid CRC
 							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
 							uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
@@ -1436,7 +1436,7 @@ void SlimSerial::rxHandlerThread() {
 								//read out one valid frame from ring buffer to m_rx_last
 								m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
 								m_rx_last.dataBytes = expectedFrameBytes;
-								remainingBytes -= expectedFrameBytes;
+								m_parse_remainingBytes -= expectedFrameBytes;
 								//process frame
 
 								receivedACK = true;
@@ -1467,7 +1467,7 @@ void SlimSerial::rxHandlerThread() {
 								else{
 								  int discardN = m_rx_circular_buf.availableData();
 								  m_rx_circular_buf.discardN(discardN);
-								  remainingBytes -= discardN;
+								  m_parse_remainingBytes -= discardN;
 
 								  continue;
 								}
@@ -1480,7 +1480,7 @@ void SlimSerial::rxHandlerThread() {
 					else {
 						//bad funcode
 						m_rx_circular_buf.discardN(1);
-						remainingBytes--;
+						m_parse_remainingBytes--;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 
