@@ -893,6 +893,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		else{
 			// no valid frame within timeout
 			m_rx_last.dataBytes=0;
+			m_txrx_time_cost = currentTime_us()-m_tx_time_start;
 
 			if (m_rx_status==SD_USART_BUSY){
 				m_rx_status = SD_USART_TIMEOUT;
@@ -1021,7 +1022,7 @@ void SlimSerial::rxHandlerThread() {
 	 /*get ready for receive*/
 	rxThreadID = (uint32_t *)osThreadGetId();
 
-	osDelay(50);
+	osDelay(100);
 	start_Rx_DMA_Idle();
 
 	/* Infinite loop */
