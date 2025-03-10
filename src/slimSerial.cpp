@@ -27,7 +27,7 @@ SlimSerial slimSerial1(&huart1,
 		USART1_485_Tx_EN_GPIO_Port,
 		USART1_485_Tx_EN_GPIO_Pin,
 		USART1_TX_MODE,
-		USART1_RX_ENABLE);
+		USART1_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART2==1
 #if PRINTF_USART == huart2
@@ -47,7 +47,7 @@ SlimSerial slimSerial2(&huart2,
 		USART2_485_Tx_EN_GPIO_Port,
 		USART2_485_Tx_EN_GPIO_Pin,
 		USART2_TX_MODE,
-		USART2_RX_ENABLE);
+		USART2_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART3==1
 #if PRINTF_USART == huart3
@@ -67,7 +67,7 @@ SlimSerial slimSerial3(&huart3,
 		USART3_485_Tx_EN_GPIO_Port,
 		USART3_485_Tx_EN_GPIO_Pin,
 		USART3_TX_MODE,
-		USART3_RX_ENABLE);
+		USART3_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART4==1
 #if PRINTF_USART == huart4
@@ -87,7 +87,7 @@ SlimSerial slimSerial4(&huart4,
 		USART4_485_Tx_EN_GPIO_Port,
 		USART4_485_Tx_EN_GPIO_Pin,
 		USART4_TX_MODE,
-		USART4_RX_ENABLE);
+		USART4_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART5==1
 #if PRINTF_USART == huart5
@@ -107,7 +107,7 @@ SlimSerial slimSerial5(&huart5,
 		USART5_485_Tx_EN_GPIO_Port,
 		USART5_485_Tx_EN_GPIO_Pin,
 		USART5_TX_MODE,
-		USART5_RX_ENABLE);
+		USART5_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART6==1
 #if PRINTF_USART == huart6
@@ -127,7 +127,7 @@ SlimSerial slimSerial6(&huart6,
 		USART6_485_Tx_EN_GPIO_Port,
 		USART6_485_Tx_EN_GPIO_Pin,
 		USART6_TX_MODE,
-		USART6_RX_ENABLE);
+		USART6_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART7==1
 #if PRINTF_USART == huart7
@@ -147,7 +147,7 @@ SlimSerial slimSerial7(&huart7,
 		USART7_485_Tx_EN_GPIO_Port,
 		USART7_485_Tx_EN_GPIO_Pin,
 		USART7_TX_MODE,
-		USART7_RX_ENABLE);
+		USART7_RX_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART8==1
 #if PRINTF_USART == huart8
@@ -167,7 +167,7 @@ SlimSerial slimSerial8(&huart8,
 		USART8_485_Tx_EN_GPIO_Port,
 		USART8_485_Tx_EN_GPIO_Pin,
 		USART8_TX_MODE,
-		USART8_RX_ENABLE);
+		USART8_RX_MODE);
 #endif
 
 #if ENABLE_PROXY==1
@@ -276,7 +276,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 			GPIO_TypeDef* tx_485_En_Port,
 			uint16_t tx_485_En_Pin,
 			uint8_t tx_method,
-			uint8_t rx_enable)
+			uint8_t rx_method)
 :m_rx_circular_buf(rx_circular_buf,rx_circular_buf_size),
  m_frameCallbackFuncArray{}{
 
@@ -302,7 +302,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	Tx_EN_Pin = tx_485_En_Pin;
 
 	//
-	m_rx_enable = rx_enable;
+	m_rx_method = rx_method;
 	m_rx_last.pdata = m_rx_frame_buf;
 	m_rx_last.dataBytes=0;
 	m_rx_frame_type = rx_frame_type;
@@ -366,10 +366,10 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 #endif
 
 	//init rx state
-	toggle485Tx(false);
+//	toggle485Tx(false);
 
 	/* definition and creation of PCInTask */
-	if(m_rx_enable){
+	if(m_rx_method>0){
 		createRxTasks();
 	}
 
@@ -394,59 +394,61 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
  const osThreadDef_t_modified os_thread_def_##name = \
  { #name, (thread), (priority), (instances), (stacksz), (buffer), (control) }
 
+ uint16_t rxTasksize=(m_rx_method==1?SLIMSERIAL_RX_TASK_BUFFER_SIZE:SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL);
 
 #if ENABLE_SLIMSERIAL_USART1
 	if(m_huart==&huart1){
-		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+
+		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx1Task), &slimSerial1);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART2
 	if(m_huart==&huart2){
-		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityLow, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityLow, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx2Task), &slimSerial2);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART3
 	if(m_huart==&huart3){
-		osThreadStaticDef_modified(rx3Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx3Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx3Task), &slimSerial3);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART4
 	if(m_huart==&huart4){
-		osThreadStaticDef_modified(rx4Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx4Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx4Task), &slimSerial4);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART5
 	if(m_huart==&huart5){
-		osThreadStaticDef_modified(rx5Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx5Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx5Task), &slimSerial5);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART6
 	if(m_huart==&huart6){
-		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityNormal, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx6Task), &slimSerial6);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART7
 	if(m_huart==&huart7){
-		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx7Task), &slimSerial7);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART8
 	if(m_huart==&huart8){
-		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx8Task), &slimSerial8);
 		return HAL_OK;
 	}
@@ -938,6 +940,16 @@ void SlimSerial::start_Rx_DMA_Idle(){
 }
 
 
+SD_BUF_INFO &SlimSerial::modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS){
+	std::array<uint8_t,8> readFrame={des,0x03,(uint8_t)(reg_address>>8),(uint8_t)(reg_address&0xFF),(uint8_t)(reg_count>>8),(uint8_t)(reg_count&0xFF),0,0};
+	uint16_t crc = SD_CRC_Calculate(&readFrame[0], 6);
+	readFrame[6] = (uint8_t) (crc &0xFF);
+	readFrame[7] = (uint8_t)(crc >> 8)&0xFF;
+
+	return transmitReceiveData(&readFrame[0],sizeof(readFrame),timeoutMS);
+}
+
+
 
 void SlimSerial::txCpltCallback()
 {
@@ -1006,313 +1018,325 @@ void SlimSerial::rxCpltCallback(uint16_t bytes_received)
 		m_huart->Lock = HAL_LOCKED;
 	}
 
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
+	if(m_rx_method==1){
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
+
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+	else if(m_rx_method==2){
+		frameParser();
+	}
 
 }
 
 
 //uint8_t serialTemp[128];
+void SlimSerial::frameParser(){
 
-void SlimSerial::rxHandlerThread() {
-	uint32_t ulTaskNotifyRet = 0;
-	 /*get ready for receive*/
-	rxThreadID = (uint32_t *)osThreadGetId();
+	m_parse_remainingBytes=m_rx_circular_buf.availableData();
 
-	osDelay(100);
-	start_Rx_DMA_Idle();
+	if(m_parse_remainingBytes<=0){
+		return ;
+	}
 
-	/* Infinite loop */
-	for (;;) {
+	if(m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_0_ANY){
 
-		ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
 
-		if(rxNeedRestart){
-			rxNeedRestart=0;
-			start_Rx_DMA_Idle();
-			continue;
-		}
+		m_rx_last.dataBytes = m_parse_remainingBytes;
 
-		m_parse_remainingBytes=m_rx_circular_buf.availableData();
+		receivedACK = true;
 
-		//un
-		if (!(ulTaskNotifyRet && m_parse_remainingBytes>0))
-			continue;
+		m_totalRxFrames++;
+		m_rx_time_validFrame = currentTime_us();
 
-		if(m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_0_ANY){
+		callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
-			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
-
-			m_rx_last.dataBytes = m_parse_remainingBytes;
-
-			receivedACK = true;
-
-			m_totalRxFrames++;
-			m_rx_time_validFrame = currentTime_us();
-
-			callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
-
-			//notify potential txrx thread
+		//notify potential txrx thread
+		if(m_rx_method==1){
 			if (txrxThreadID != NULL) {
 				xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
 			}
-
-			m_rx_status = SD_USART_OK;
-
 		}
-		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
-			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
-			//5+N+2
-			//Header1 + Header2 + Src + dataBytes +  Funcode  + data + crc16
-			// dataBytes =   sizeof(data)
-			if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
-				while (m_parse_remainingBytes >= 7) {
+		else if(m_rx_method==2){
+			if (txrxThreadID != NULL) {
+				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+				xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+			}
+		}
 
-					//check header, current support 5A A5 and FF FF
-					uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
-					if (applyHeaderFilter(header[0], header[1])) {
+		m_rx_status = SD_USART_OK;
 
-						//check address. disabled by default. Call toggleAddressFilter(True) to enable
-						uint8_t addressIn = m_rx_circular_buf.peekAt(2);
-						if(applyAddressFilter(addressIn)){
+	}
+	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
+		//std::unique_lock<std::mutex> lk_decode(decodeMtx);
+		//5+N+2
+		//Header1 + Header2 + Src + dataBytes +  Funcode  + data + crc16
+		// dataBytes =   sizeof(data)
+		if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+			while (m_parse_remainingBytes >= 7) {
 
-							//check address. disabled by default. Call toggleFuncodeFilter(True) to enable
-							uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
-							if(applyFuncodeFilter(funcodeIn)){
+				//check header, current support 5A A5 and FF FF
+				uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
+				if (applyHeaderFilter(header[0], header[1])) {
 
-								//total frame length
-								uint16_t expectedFrameBytes;
-								if(lengthFilterOn){
-									expectedFrameBytes = m_rx_circular_buf.peekAt(3) + 7;
-								}
-								else{
-									expectedFrameBytes=m_parse_remainingBytes;
-								}
-								//check length
-								if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
+					//check address. disabled by default. Call toggleAddressFilter(True) to enable
+					uint8_t addressIn = m_rx_circular_buf.peekAt(2);
+					if(applyAddressFilter(addressIn)){
 
-									if (expectedFrameBytes <= m_parse_remainingBytes) {
+						//check address. disabled by default. Call toggleFuncodeFilter(True) to enable
+						uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
+						if(applyFuncodeFilter(funcodeIn)){
 
-										//valid CRC
-										uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-										uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
+							//total frame length
+							uint16_t expectedFrameBytes;
+							if(lengthFilterOn){
+								expectedFrameBytes = m_rx_circular_buf.peekAt(3) + 7;
+							}
+							else{
+								expectedFrameBytes=m_parse_remainingBytes;
+							}
+							//check length
+							if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
 
-										if (crc1 == crc2) {
+								if (expectedFrameBytes <= m_parse_remainingBytes) {
 
-											//read out one valid frame from ring buffer to m_rx_last
-											m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
-											m_rx_last.dataBytes = expectedFrameBytes;
-											m_parse_remainingBytes -= expectedFrameBytes;
-											//process frame
+									//valid CRC
+									uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+									uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
 
-											receivedACK = true;
+									if (crc1 == crc2) {
 
-											m_totalRxFrames++;
+										//read out one valid frame from ring buffer to m_rx_last
+										m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
+										m_rx_last.dataBytes = expectedFrameBytes;
+										m_parse_remainingBytes -= expectedFrameBytes;
+										//process frame
 
-											m_rx_time_validFrame = currentTime_us();
+										receivedACK = true;
+
+										m_totalRxFrames++;
+
+										m_rx_time_validFrame = currentTime_us();
 #if ENABLE_PROXY==1
-											if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
-												//enable proxy
-												if(m_rx_last.dataBytes==12){
-													uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
-													uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
-													enableProxy(proxyPortIndex_,proxyPortBaudrate_);
-												}
+										if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
+											//enable proxy
+											if(m_rx_last.dataBytes==12){
+												uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
+												uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
+												enableProxy(proxyPortIndex_,proxyPortBaudrate_);
+											}
 
-											}
-											else if(funcodeIn == FUNC_DISABLE_PROXY_INTERNAL){
-												//should take no effect. Anyway, we respond to the request
-												disableProxy();
-												ackProxy();
-											}
-											else{
+										}
+										else if(funcodeIn == FUNC_DISABLE_PROXY_INTERNAL){
+											//should take no effect. Anyway, we respond to the request
+											disableProxy();
+											ackProxy();
+										}
+										else{
 #endif
-												callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
-													//notify potential txrx thread
+											callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
+												//notify potential txrx thread
+											if(m_rx_method==1){
 												if (txrxThreadID != NULL) {
 													xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
 												}
-
-												m_rx_status = SD_USART_OK;
-												continue;
-#if ENABLE_PROXY==1
 											}
-#endif
-										}
+											else if(m_rx_method==2){
+												if (txrxThreadID != NULL) {
+													BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+													xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+												}
+											}
 
-										else {
-											//bad crc
-						                      int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-						                      m_parse_remainingBytes -= discardN;
-											m_rx_status = SD_USART_ERROR;
+											m_rx_status = SD_USART_OK;
 											continue;
+#if ENABLE_PROXY==1
 										}
-
-									} else {
-										//unfinished frame
-										m_rx_status = SD_USART_BUSY;
-										break;
-
+#endif
 									}
-								}
-								else{//invalid length
-									int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-									m_parse_remainingBytes -= discardN;
-									m_rx_status = SD_USART_ERROR;
-									continue;
+
+									else {
+										//bad crc
+										  int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+										  m_parse_remainingBytes -= discardN;
+										m_rx_status = SD_USART_ERROR;
+										continue;
+									}
+
+								} else {
+									//unfinished frame
+									m_rx_status = SD_USART_BUSY;
+									break;
+
 								}
 							}
-							else{//invalid funcode
+							else{//invalid length
 								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
 								m_parse_remainingBytes -= discardN;
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
 						}
-						else{//invalid address
+						else{//invalid funcode
 							int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
 							m_parse_remainingBytes -= discardN;
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
-					} else {//invalid header
+					}
+					else{//invalid address
 						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
 						m_parse_remainingBytes -= discardN;
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
+				} else {//invalid header
+					int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+					m_parse_remainingBytes -= discardN;
+					m_rx_status = SD_USART_ERROR;
+					continue;
+				}
 
+			}
+		}
+#if ENABLE_PROXY==1
+		else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
+			m_rx_last.dataBytes = m_parse_remainingBytes;
+			m_totalRxFrames++;
+
+			//in transparent mode, only check FUNC_DISABLE_PROXY_INTERNAL to disable proxy
+			if( m_rx_last.dataBytes>=7 &&
+				m_rx_last.pdata[0]==0x5A &&
+				m_rx_last.pdata[1]==0xA5 &&
+				m_rx_last.pdata[2]==0x00 &&
+				m_rx_last.pdata[3]==0x00 &&
+				m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY_INTERNAL)
+				){
+				uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
+				uint16_t crc2 = m_rx_last.pdata[5] | ((uint16_t)m_rx_last.pdata[6])<<8 ;
+				if(crc1 == crc2){
+					//disable proxy
+					disableProxy();
+					ackProxy();
 				}
 			}
-#if ENABLE_PROXY==1
-			else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-				m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
-				m_rx_last.dataBytes = m_parse_remainingBytes;
-				m_totalRxFrames++;
+			else{
 
-				//in transparent mode, only check FUNC_DISABLE_PROXY_INTERNAL to disable proxy
-				if( m_rx_last.dataBytes>=7 &&
-				 	m_rx_last.pdata[0]==0x5A &&
-					m_rx_last.pdata[1]==0xA5 &&
-					m_rx_last.pdata[2]==0x00 &&
-					m_rx_last.pdata[3]==0x00 &&
-					m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY_INTERNAL)
-					){
-					uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
-					uint16_t crc2 = m_rx_last.pdata[5] | ((uint16_t)m_rx_last.pdata[6])<<8 ;
-					if(crc1 == crc2){
-						//disable proxy
-						disableProxy();
-						ackProxy();
-					}
+				proxyDelegateMessage(m_rx_last.pdata, m_rx_last.dataBytes);
+			}
+		}
+#endif
+	}
+	else if (m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_2){
+		//std::unique_lock<std::mutex> lk_decode(decodeMtx);
+
+		//2+N+2
+		//Header1 + Header2 + databytes + data + crc16
+		//databytes = 1 + sizeof(data)
+		while (m_parse_remainingBytes >= 4) {
+
+			//check header, current support 5A A5 and FF FF
+			uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
+			if (applyHeaderFilter(header[0], header[1])) {
+
+				//total frame length
+				uint16_t expectedFrameBytes;
+				if(lengthFilterOn){
+					expectedFrameBytes = m_rx_circular_buf.peekAt(2) + 4;
 				}
 				else{
-
-					proxyDelegateMessage(m_rx_last.pdata, m_rx_last.dataBytes);
+					expectedFrameBytes=m_parse_remainingBytes;
 				}
-			}
-#endif
-		}
-		else if (m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_2){
-			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
+				//check length
+				if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
 
-			//2+N+2
-			//Header1 + Header2 + databytes + data + crc16
-			//databytes = 1 + sizeof(data)
-			while (m_parse_remainingBytes >= 4) {
+					if (expectedFrameBytes <= m_parse_remainingBytes) {
 
-				//check header, current support 5A A5 and FF FF
-				uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
-				if (applyHeaderFilter(header[0], header[1])) {
+						//valid CRC
+						uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+						uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
 
-					//total frame length
-					uint16_t expectedFrameBytes;
-					if(lengthFilterOn){
-						expectedFrameBytes = m_rx_circular_buf.peekAt(2) + 4;
-					}
-					else{
-						expectedFrameBytes=m_parse_remainingBytes;
-					}
-					//check length
-					if (expectedFrameBytes <= m_rx_pingpong_buf_half_size){
+						if (crc1 == crc2) {
 
-						if (expectedFrameBytes <= m_parse_remainingBytes) {
+							//read out one valid frame from ring buffer to m_rx_last
+							m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
+							m_rx_last.dataBytes = expectedFrameBytes;
+							m_parse_remainingBytes -= expectedFrameBytes;
+							//process frame
 
-							//valid CRC
-							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-							uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
+							receivedACK = true;
 
-							if (crc1 == crc2) {
+							m_totalRxFrames++;
+							m_rx_time_validFrame = currentTime_us();
 
-								//read out one valid frame from ring buffer to m_rx_last
-								m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
-								m_rx_last.dataBytes = expectedFrameBytes;
-								m_parse_remainingBytes -= expectedFrameBytes;
-								//process frame
-
-								receivedACK = true;
-
-								m_totalRxFrames++;
-								m_rx_time_validFrame = currentTime_us();
-
-								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
+							callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
 
 
-								//notify potential txrx thread
+							//notify potential txrx thread
+							if(m_rx_method==1){
 								if (txrxThreadID != NULL) {
 									xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
 								}
-
-								m_rx_status = SD_USART_OK;
-								continue;
-
+							}
+							else if(m_rx_method==2){
+								if (txrxThreadID != NULL) {
+									BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+									xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+								}
 							}
 
-							else {
-								//bad crc
-								int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-								m_parse_remainingBytes -= discardN;
-								m_rx_status = SD_USART_ERROR;
-								continue;
-							}
-
-						} else {
-							//unfinished frame
-							m_rx_status = SD_USART_BUSY;
-							break;
+							m_rx_status = SD_USART_OK;
+							continue;
 
 						}
-					}
-					else{//invalid length
-						int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-						m_parse_remainingBytes -= discardN;
-						m_rx_status = SD_USART_ERROR;
-						continue;
-					}
 
-				} else {//invalid header
+						else {
+							//bad crc
+							int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
+							m_parse_remainingBytes -= discardN;
+							m_rx_status = SD_USART_ERROR;
+							continue;
+						}
+
+					} else {
+						//unfinished frame
+						m_rx_status = SD_USART_BUSY;
+						break;
+
+					}
+				}
+				else{//invalid length
 					int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
 					m_parse_remainingBytes -= discardN;
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
+
+			} else {//invalid header
+				int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
+				m_parse_remainingBytes -= discardN;
+				m_rx_status = SD_USART_ERROR;
+				continue;
 			}
 		}
-		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM){
+	}
+	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM){
 
-			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
+		//std::unique_lock<std::mutex> lk_decode(decodeMtx);
 
-			//modbus frame
-			//src + funcode + data + crc16
-			while (m_parse_remainingBytes >= 8) {
+		//modbus frame
+		//src + funcode + data + crc16
+		while (m_parse_remainingBytes >= 8) {
 
-				//check address. disabled by default
-				//uint8_t addressIn = m_rx_circular_buf.peekAt(0);
-
+			//check address. disabled by default. Call toggleAddressFilter(True) to enable
+			uint8_t addressIn = m_rx_circular_buf.peekAt(0);
+			if(applyAddressFilter(addressIn)){
 
 				//check funcode
 				uint16_t funcode = m_rx_circular_buf.peekAt(1);
@@ -1330,8 +1354,8 @@ void SlimSerial::rxHandlerThread() {
 					  expectedFrameBytes  =  (uint16_t)(m_rx_circular_buf.peekAt(6)) + 9;
 					}
 
-		            // got enough rx bytes
-		            if (m_parse_remainingBytes >= expectedFrameBytes) {
+					// got enough rx bytes
+					if (m_parse_remainingBytes >= expectedFrameBytes) {
 							//valid CRC
 							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
 							uint16_t crc2 = m_rx_circular_buf.peekAt_U16(expectedFrameBytes - 2);
@@ -1354,10 +1378,17 @@ void SlimSerial::rxHandlerThread() {
 
 
 								//notify potential txrx thread
-								if (txrxThreadID != NULL) {
-									xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+								if(m_rx_method==1){
+									if (txrxThreadID != NULL) {
+										xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+									}
 								}
-
+								else if(m_rx_method==2){
+									if (txrxThreadID != NULL) {
+										BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+										xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+									}
+								}
 								m_rx_status = SD_USART_OK;
 								continue;
 
@@ -1382,10 +1413,10 @@ void SlimSerial::rxHandlerThread() {
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
-		            } else {//unfinished frame
-		              m_rx_status = SD_USART_BUSY;
-		              break;
-		            }
+					} else {//unfinished frame
+					  m_rx_status = SD_USART_BUSY;
+					  break;
+					}
 				} else {
 					//bad funcode
 					m_rx_circular_buf.discardN(1);
@@ -1395,17 +1426,26 @@ void SlimSerial::rxHandlerThread() {
 
 				}
 			}
+			else{
+				//bad address
+				m_rx_circular_buf.discardN(1);
+				m_parse_remainingBytes--;
+				m_rx_status = SD_USART_ERROR;
+				continue;
+			}
 		}
-		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM){
+	}
+	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM){
 
-				//std::unique_lock<std::mutex> lk_decode(decodeMtx);
+			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
 
-				//modbus frame
-				//src + funcode + data + crc16
-				while (m_parse_remainingBytes >= 5) {
+			//modbus frame
+			//src + funcode + data + crc16
+			while (m_parse_remainingBytes >= 5) {
 
-					//check address. disabled by default
-					//uint8_t addressIn = m_rx_circular_buf.peekAt(0);
+				//check address. disabled by default. Call toggleAddressFilter(True) to enable
+				uint8_t addressIn = m_rx_circular_buf.peekAt(0);
+				if(applyAddressFilter(addressIn)){
 
 
 					//check funcode
@@ -1450,8 +1490,16 @@ void SlimSerial::rxHandlerThread() {
 
 
 								//notify potential txrx thread
-								if (txrxThreadID != NULL) {
-									xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+								if(m_rx_method==1){
+									if (txrxThreadID != NULL) {
+										xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+									}
+								}
+								else if(m_rx_method==2){
+									if (txrxThreadID != NULL) {
+										BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+										xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+									}
 								}
 
 								m_rx_status = SD_USART_OK;
@@ -1487,14 +1535,51 @@ void SlimSerial::rxHandlerThread() {
 
 					}
 				}
+				else{
+					//bad address
+					m_rx_circular_buf.discardN(1);
+					m_parse_remainingBytes--;
+					m_rx_status = SD_USART_ERROR;
+					continue;
+
+				}
 			}
-
-		else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_NONE){
-
 		}
-		m_rx_time_end = currentTime_us();
-		m_rx_time_cost = m_rx_time_end-m_rx_time_start;
-		m_txrx_time_cost = m_rx_time_end-m_tx_time_start;
+
+	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_NONE){
+
+	}
+	m_rx_time_end = currentTime_us();
+	m_rx_time_cost = m_rx_time_end-m_rx_time_start;
+	m_txrx_time_cost = m_rx_time_end-m_tx_time_start;
+}
+
+void SlimSerial::rxHandlerThread() {
+	uint32_t ulTaskNotifyRet = 0;
+	 /*get ready for receive*/
+	rxThreadID = (uint32_t *)osThreadGetId();
+
+	osDelay(100);
+	start_Rx_DMA_Idle();
+
+	/* Infinite loop */
+	for (;;) {
+
+		ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+		if(rxNeedRestart){
+			rxNeedRestart=0;
+			start_Rx_DMA_Idle();
+			continue;
+		}
+
+		if (!(ulTaskNotifyRet && m_rx_circular_buf.availableData()>0))
+			continue;
+
+		if(m_rx_method==1){
+			frameParser();
+		}
+
 
 	}
 }
@@ -1505,6 +1590,7 @@ uint32_t SlimSerial::getRxIdleTimeUs(){
 uint32_t SlimSerial::getRxFrameIdleTimeUs(){
 	return currentTime_us()- m_rx_time_validFrame;
 }
+
 
 
 void SlimSerial::restartRxFromISR(){

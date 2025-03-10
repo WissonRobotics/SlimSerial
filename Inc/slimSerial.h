@@ -11,6 +11,7 @@
 #include "slimSerial_Configs.h"
 
 #define INTERNAL_MAX_FRAME_SIZE 1024
+#define SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL 128
 
 typedef struct SLIMSERIAL_FRAME_TYPE_0_TAG {
 	union {
@@ -123,7 +124,7 @@ public:
 			GPIO_TypeDef* tx_485_En_Port = NULL,
 			uint16_t tx_485_En_Pin = 0,
 			uint8_t tx_method = 1,
-			uint8_t rx_enable = 1);
+			uint8_t rx_method = 1);
 
 	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
@@ -136,6 +137,8 @@ public:
 	SD_BUF_INFO &transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload=NULL,uint16_t payloadBytes=0,uint16_t timeout=20);
 
 	SD_BUF_INFO &transmitReceiveData(uint8_t *pdata,uint16_t dataBytes,uint16_t timeout,bool frameTypeFilterOn=true);
+
+	SD_BUF_INFO &modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS=20);
 
 	void addRxFrameCallback(std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)> &frameCallbackFunc);
 	void addRxFrameCallback(void (*frameCallbackFunc)(SlimSerial *,uint8_t *,uint16_t ));
@@ -217,6 +220,8 @@ public:
 
 private:
 
+	void frameParser();
+
 	bool getACK(){
 		return  receivedACK;
 	};
@@ -289,8 +294,7 @@ private:
 	bool receivedACK;
 
 	//rx enable
-	uint8_t m_rx_enable;
-
+	uint8_t m_rx_method; //0: no rx; 1:handle rx frame in task;  2:handle rx frame in interrupt.
 
 	//485 tx enable ping
 	GPIO_TypeDef* Tx_EN_Port;
