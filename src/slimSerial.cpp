@@ -1339,18 +1339,17 @@ void SlimSerial::frameParser(){
 			if(applyAddressFilter(addressIn)){
 
 				//check funcode
-				uint16_t funcode = m_rx_circular_buf.peekAt(1);
-
-				if (funcode == 0x03 || funcode == 0x06 || funcode == 0x10) {
+				uint16_t funcodeIn = m_rx_circular_buf.peekAt(1);
+				if(applyFuncodeFilter(funcodeIn)){
 
 					uint16_t expectedFrameBytes =0 ;
-					if (funcode == 0x03) {
+					if (funcodeIn == 0x03) {
 					  expectedFrameBytes  = 8;
 					}
-					else if(funcode == 0x06){
+					else if(funcodeIn == 0x06){
 					  expectedFrameBytes  =  m_rx_circular_buf.availableData();//special treatment for 0x06
 					}
-					else if (funcode == 0x10) {
+					else if (funcodeIn == 0x10) {
 					  expectedFrameBytes  =  (uint16_t)(m_rx_circular_buf.peekAt(6)) + 9;
 					}
 
@@ -1396,7 +1395,7 @@ void SlimSerial::frameParser(){
 
 							else {
 								//bad crc
-								 if(funcode == 0x06 && m_rx_circular_buf.availableData()<256){//special treatment for 0x06
+								 if(funcodeIn == 0x06 && m_rx_circular_buf.availableData()<256){//special treatment for 0x06
 								  m_rx_status = SD_USART_BUSY;
 								  break;
 								}
@@ -1440,7 +1439,7 @@ void SlimSerial::frameParser(){
 			//std::unique_lock<std::mutex> lk_decode(decodeMtx);
 
 			//modbus frame
-			//src + funcode + data + crc16
+			//src + funcodeIn + data + crc16
 			while (m_parse_remainingBytes >= 5) {
 
 				//check address. disabled by default. Call toggleAddressFilter(True) to enable
@@ -1449,18 +1448,19 @@ void SlimSerial::frameParser(){
 
 
 					//check funcode
-					uint16_t funcode = m_rx_circular_buf.peekAt(1);
+					uint16_t funcodeIn = m_rx_circular_buf.peekAt(1);
+					if(applyFuncodeFilter(funcodeIn)){
 
-					if (funcode == 0x03 || funcode == 0x06 || funcode == 0x10 || funcode == (0x83) || funcode == 0x86 || funcode == 0x90) {
+//					if (funcodeIn == 0x03 || funcodeIn == 0x06 || funcodeIn == 0x10 || funcodeIn == (0x83) || funcodeIn == 0x86 || funcodeIn == 0x90) {
 
 						 uint16_t expectedFrameBytes=0;
-						if (funcode == 0x03) {
+						if (funcodeIn == 0x03) {
 						  expectedFrameBytes  = (uint8_t)(m_rx_circular_buf.peekAt(2)) + 5;
 						}
-						else if(funcode == 0x06){
+						else if(funcodeIn == 0x06){
 						  expectedFrameBytes  =  m_rx_circular_buf.availableData();//special treatment for 0x06
 						}
-						else if (funcode == 0x10) {
+						else if (funcodeIn == 0x10) {
 						  expectedFrameBytes  =  8;
 						}
 						else{
@@ -1509,7 +1509,7 @@ void SlimSerial::frameParser(){
 
 							else {
 								//bad crc
-								 if(funcode == 0x06 && m_rx_circular_buf.availableData()<256){//special treatment for 0x06
+								 if(funcodeIn == 0x06 && m_rx_circular_buf.availableData()<256){//special treatment for 0x06
 								  m_rx_status = SD_USART_BUSY;
 								  break;
 								}
