@@ -1862,6 +1862,9 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 	//restart
 	SlimSerial *slimSerialDev=getSlimSerial(huart);
 	if(slimSerialDev){
+		//clear rx error flag
+		__HAL_UART_CLEAR_PEFLAG(huart);
+
 		slimSerialDev->restartRxFromISR();
 	}
 
