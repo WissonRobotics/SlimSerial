@@ -7,5 +7,5 @@ SlimSerial 是一个基于 FreeRTOS 的 STM32 通用串口收发库，内置接�
  
 # 教程
 
-需要额外提供 配置文件  slimSerial_Configs.h   （参考  Inc/slimSerial_Configs_template.h ）
+需要额外提供 配置文件  slimSerial_Configs.h   （参考  slimSerial_Configs_template.h ）
  
