@@ -170,11 +170,11 @@ SlimSerial slimSerial8(&huart8,
 		USART8_RX_MODE);
 #endif
 
-#if ENABLE_PROXY==1
-std::array<uint8_t,1029*2> USART_PROXY_RX_PINGPONG_BUFFER;
-std::array<uint8_t,4096> USART_PROXY_RX_CIRCULAR_BUFFER;
-std::array<uint8_t,1029> USART_PROXY_RX_FRAME_BUFFER;
-#endif
+// #if ENABLE_PROXY==1
+// std::array<uint8_t,1029*2> USART_PROXY_RX_PINGPONG_BUFFER;
+// std::array<uint8_t,4096> USART_PROXY_RX_CIRCULAR_BUFFER;
+// std::array<uint8_t,1029> USART_PROXY_RX_FRAME_BUFFER;
+// #endif
 
 inline constexpr uint16_t SLIM_SERIAL_TOTAL_NUM=(ENABLE_SLIMSERIAL_USART1+ENABLE_SLIMSERIAL_USART2+ENABLE_SLIMSERIAL_USART3+ENABLE_SLIMSERIAL_USART4+ENABLE_SLIMSERIAL_USART5+ENABLE_SLIMSERIAL_USART6+ENABLE_SLIMSERIAL_USART7+ENABLE_SLIMSERIAL_USART8);
 
@@ -1044,34 +1044,42 @@ void SlimSerial::frameParser(){
 
 	if(m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_0_ANY){
 
-		m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
-
-		m_rx_last.dataBytes = m_parse_remainingBytes;
-
-		receivedACK = true;
-
-		m_totalRxFrames++;
-		m_rx_time_validFrame = currentTime_us();
-
-		callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
-
-		//notify potential txrx thread
-		if(m_rx_method==1){
-			if (txrxThreadID != NULL) {
-				xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-			}
+		//temperory change to frame type 1 if got 5A A5 header
+		if(m_parse_remainingBytes>=2 && m_rx_circular_buf.peekAt(0) == 0x5A && m_rx_circular_buf.peekAt(1)== 0xA5){
+			m_rx_frame_type_ori = m_rx_frame_type;
+			m_rx_frame_type=SLIMSERIAL_FRAME_TYPE_1;
 		}
-		else if(m_rx_method==2){
-			if (txrxThreadID != NULL) {
-				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-				xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-			}
-		}
+		else{
+			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
 
-		m_rx_status = SD_USART_OK;
+			m_rx_last.dataBytes = m_parse_remainingBytes;
+
+			receivedACK = true;
+
+			m_totalRxFrames++;
+			m_rx_time_validFrame = currentTime_us();
+
+			callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
+
+			//notify potential txrx thread
+			if(m_rx_method==1){
+				if (txrxThreadID != NULL) {
+					xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
+				}
+			}
+			else if(m_rx_method==2){
+				if (txrxThreadID != NULL) {
+					BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+					xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
+				}
+			}
+
+			m_rx_status = SD_USART_OK;
+		}
 
 	}
-	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
+
+	if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_1){
 		//std::unique_lock<std::mutex> lk_decode(decodeMtx);
 		//5+N+2
 		//Header1 + Header2 + Src + dataBytes +  Funcode  + data + crc16
@@ -1153,6 +1161,11 @@ void SlimSerial::frameParser(){
 											}
 
 											m_rx_status = SD_USART_OK;
+
+											//after getting a valid frame 1, if the original type is frame_type_0, change it back
+											if(m_rx_frame_type_ori==SLIMSERIAL_FRAME_TYPE_0_ANY){
+												m_rx_frame_type = m_rx_frame_type_ori;
+											}
 											continue;
 #if ENABLE_PROXY==1
 										}
@@ -1681,7 +1694,7 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 		ackProxy();
 
- 		HAL_Delay(1);
+ 		HAL_Delay(2);
 
 		//change settings of current serial port
 		m_proxy_port = proxy_port_;

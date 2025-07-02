@@ -312,6 +312,7 @@ private:
 	3:  MODBUS frame
 	*/
 	uint8_t m_rx_frame_type;
+	uint8_t m_rx_frame_type_ori;
 
 	//synchronization tools
 	bool writeLocked = false;
