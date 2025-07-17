@@ -10,7 +10,7 @@
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #if PRINTF_USART == huart1
-#define USART1_TX_QUEUE_SIZE 2
+#define USART1_TX_QUEUE_SIZE 4
 #else
 #define USART1_TX_QUEUE_SIZE 2
 #endif
@@ -31,7 +31,7 @@ SlimSerial slimSerial1(&huart1,
 #endif
 #if ENABLE_SLIMSERIAL_USART2==1
 #if PRINTF_USART == huart2
-#define USART2_TX_QUEUE_SIZE 2
+#define USART2_TX_QUEUE_SIZE 4
 #else
 #define USART2_TX_QUEUE_SIZE 2
 #endif
@@ -51,7 +51,7 @@ SlimSerial slimSerial2(&huart2,
 #endif
 #if ENABLE_SLIMSERIAL_USART3==1
 #if PRINTF_USART == huart3
-#define USART3_TX_QUEUE_SIZE 2
+#define USART3_TX_QUEUE_SIZE 4
 #else
 #define USART3_TX_QUEUE_SIZE 2
 #endif
@@ -71,7 +71,7 @@ SlimSerial slimSerial3(&huart3,
 #endif
 #if ENABLE_SLIMSERIAL_USART4==1
 #if PRINTF_USART == huart4
-#define USART4_TX_QUEUE_SIZE 2
+#define USART4_TX_QUEUE_SIZE 4
 #else
 #define USART4_TX_QUEUE_SIZE 2
 #endif
@@ -91,7 +91,7 @@ SlimSerial slimSerial4(&huart4,
 #endif
 #if ENABLE_SLIMSERIAL_USART5==1
 #if PRINTF_USART == huart5
-#define USART5_TX_QUEUE_SIZE 2
+#define USART5_TX_QUEUE_SIZE 4
 #else
 #define USART5_TX_QUEUE_SIZE 2
 #endif
@@ -111,7 +111,7 @@ SlimSerial slimSerial5(&huart5,
 #endif
 #if ENABLE_SLIMSERIAL_USART6==1
 #if PRINTF_USART == huart6
-#define USART6_TX_QUEUE_SIZE 2
+#define USART6_TX_QUEUE_SIZE 4
 #else
 #define USART6_TX_QUEUE_SIZE 2
 #endif
@@ -131,7 +131,7 @@ SlimSerial slimSerial6(&huart6,
 #endif
 #if ENABLE_SLIMSERIAL_USART7==1
 #if PRINTF_USART == huart7
-#define USART7_TX_QUEUE_SIZE 2
+#define USART7_TX_QUEUE_SIZE 4
 #else
 #define USART7_TX_QUEUE_SIZE 2
 #endif
@@ -151,7 +151,7 @@ SlimSerial slimSerial7(&huart7,
 #endif
 #if ENABLE_SLIMSERIAL_USART8==1
 #if PRINTF_USART == huart8
-#define USART8_TX_QUEUE_SIZE 2
+#define USART8_TX_QUEUE_SIZE 4
 #else
 #define USART8_TX_QUEUE_SIZE 2
 #endif
@@ -1831,12 +1831,8 @@ extern "C" {
 /*Redirect printf() by implementing _write  or  fputc based on different compiler*/
 #if defined(__GNUC__) && defined(PRINTF_USART)
 int _write(int file, char *pSrc, int len){
-	SlimSerial *slimSerialDev=getSlimSerial(&PRINTF_USART);
-	if(slimSerialDev){
-		return slimSerialDev->transmitData((uint8_t *)pSrc,len);
-	}
-	else
-		return 0;
+	return getSlimSerial(&PRINTF_USART)->transmitData((uint8_t *)pSrc,len);
+
 }
 #elif defined (__CC_ARM)
 int fputc(int ch, FILE *f)
