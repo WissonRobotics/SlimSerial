@@ -20,23 +20,22 @@ class CURCULAR_BUFFER {
 public:
 	CURCULAR_BUFFER(uint8_t *pBuf, uint16_t bufzise) {
 
-		if (!is_power_of_2(bufzise)) {
-
-			bufzise = shrinkTo_power_of_2(bufzise);
-
-		}
-		buffer = pBuf;
-		bufferSize = bufzise;
-		mask = bufferSize - 1;
-
-		reset();
+		reset(pBuf, bufzise);
 	}
 	void reset(uint8_t *pBuf=NULL, uint16_t bufzise=0) {
 
 		if(pBuf){
+			if (!is_power_of_2(bufzise)) {
+				bufzise = shrinkTo_power_of_2(bufzise);
+			}
 			buffer = pBuf;
 			bufferSize = bufzise;
 			mask = bufferSize - 1;
+		}
+		else{
+			buffer = 0;
+			bufferSize = 0;
+			mask = 0;
 		}
 		head = 0;
 		tail = 0;
@@ -75,6 +74,14 @@ public:
 		len = (len > ltemp) ? ltemp : len;
 
 		copy_in( pSrc, len, head);
+		head += len;
+		return len;
+	}
+	uint32_t in_U16LB(const uint16_t* pSrc, uint32_t len) {
+		uint32_t ltemp = unusedSpace();
+		len = (len > ltemp) ? ltemp : len;
+
+		copy_in_U16LB( pSrc, len, head);
 		head += len;
 		return len;
 	}
@@ -169,6 +176,12 @@ private:
 	
 	uint32_t	mask;
 
+	static void memcpy_U16LB(uint8_t *des, const uint16_t *src, size_t len){
+       for(size_t i=0;i<len;i++){
+    	   des[i] = (uint8_t)(src[i] & 0xFF);
+       }
+    }
+
 	uint32_t in_overwrite(const uint8_t* pSrc, uint32_t len) {
 		uint32_t ltemp = unusedSpace();
 
@@ -197,7 +210,21 @@ private:
 		memcpy(buffer, pSrc + ltemp, len - ltemp);
 
 	}
+	void copy_in_U16LB(const uint16_t* pSrc, uint32_t len, uint32_t off)
+	{
 
+		uint32_t ltemp;
+
+		off &= mask;
+
+		uint32_t tm = bufferSize - off;
+
+		ltemp = len < tm ? len : tm;
+
+		memcpy_U16LB(buffer + off, pSrc, ltemp);
+		memcpy_U16LB(buffer, pSrc + ltemp, len - ltemp);
+
+	}
 	void copy_out(uint8_t* pDes, uint32_t len, uint32_t off)
 	{
 		uint32_t ltemp;
