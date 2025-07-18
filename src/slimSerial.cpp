@@ -1831,8 +1831,12 @@ extern "C" {
 /*Redirect printf() by implementing _write  or  fputc based on different compiler*/
 #if defined(__GNUC__) && defined(PRINTF_USART)
 int _write(int file, char *pSrc, int len){
-	return getSlimSerial(&PRINTF_USART)->transmitData((uint8_t *)pSrc,len);
-
+	SlimSerial *slimSerialDev=getSlimSerial(&PRINTF_USART);
+	if(slimSerialDev){
+		return slimSerialDev->transmitData((uint8_t *)pSrc,len);
+	}
+	else
+		return 0;
 }
 #elif defined (__CC_ARM)
 int fputc(int ch, FILE *f)
