@@ -9,13 +9,14 @@
 #include "main.h"
 
 #if ENABLE_SLIMSERIAL_USART1==1
-#if PRINTF_USART == huart1
-#define USART1_TX_QUEUE_SIZE 4
-#else
-#define USART1_TX_QUEUE_SIZE 2
-#endif
+#define USART1_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART1_9_BITS_MODE == 0
 uint8_t USART1_TX_QUEUE_BUFFER[USART1_TX_FRAME_MAX_SIZE*USART1_TX_QUEUE_SIZE];
 uint8_t USART1_RX_PINGPONG_BUFFER[USART1_RX_FRAME_MAX_SIZE*2];
+#elif USART1_9_BITS_MODE == 1
+uint16_t USART1_TX_QUEUE_BUFFER[USART1_TX_FRAME_MAX_SIZE*USART1_TX_QUEUE_SIZE];
+uint16_t USART1_RX_PINGPONG_BUFFER[USART1_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART1_RX_CIRCULAR_BUFFER[USART1_RX_FRAME_MAX_SIZE*2];
 uint8_t USART1_RX_FRAME_BUFFER[USART1_RX_FRAME_MAX_SIZE];
 
@@ -27,16 +28,19 @@ SlimSerial slimSerial1(&huart1,
 		USART1_485_Tx_EN_GPIO_Port,
 		USART1_485_Tx_EN_GPIO_Pin,
 		USART1_TX_MODE,
-		USART1_RX_MODE);
+		USART1_RX_MODE,
+		USART1_9_BITS_MODE);
 #endif
+
 #if ENABLE_SLIMSERIAL_USART2==1
-#if PRINTF_USART == huart2
-#define USART2_TX_QUEUE_SIZE 4
-#else
-#define USART2_TX_QUEUE_SIZE 2
-#endif
+#define USART2_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART2_9_BITS_MODE == 0
 uint8_t USART2_TX_QUEUE_BUFFER[USART2_TX_FRAME_MAX_SIZE*USART2_TX_QUEUE_SIZE];
 uint8_t USART2_RX_PINGPONG_BUFFER[USART2_RX_FRAME_MAX_SIZE*2];
+#elif USART2_9_BITS_MODE == 1
+uint16_t USART2_TX_QUEUE_BUFFER[USART2_TX_FRAME_MAX_SIZE*USART2_TX_QUEUE_SIZE];
+uint16_t USART2_RX_PINGPONG_BUFFER[USART2_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART2_RX_CIRCULAR_BUFFER[USART2_RX_FRAME_MAX_SIZE*2];
 uint8_t USART2_RX_FRAME_BUFFER[USART2_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial2(&huart2,
@@ -47,16 +51,19 @@ SlimSerial slimSerial2(&huart2,
 		USART2_485_Tx_EN_GPIO_Port,
 		USART2_485_Tx_EN_GPIO_Pin,
 		USART2_TX_MODE,
-		USART2_RX_MODE);
+		USART2_RX_MODE,
+		USART2_9_BITS_MODE);
 #endif
+
 #if ENABLE_SLIMSERIAL_USART3==1
-#if PRINTF_USART == huart3
-#define USART3_TX_QUEUE_SIZE 4
-#else
-#define USART3_TX_QUEUE_SIZE 2
-#endif
+#define USART3_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART3_9_BITS_MODE == 0
 uint8_t USART3_TX_QUEUE_BUFFER[USART3_TX_FRAME_MAX_SIZE*USART3_TX_QUEUE_SIZE];
 uint8_t USART3_RX_PINGPONG_BUFFER[USART3_RX_FRAME_MAX_SIZE*2];
+#elif USART3_9_BITS_MODE == 1
+uint16_t USART3_TX_QUEUE_BUFFER[USART3_TX_FRAME_MAX_SIZE*USART3_TX_QUEUE_SIZE];
+uint16_t USART3_RX_PINGPONG_BUFFER[USART3_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART3_RX_CIRCULAR_BUFFER[USART3_RX_FRAME_MAX_SIZE*2];
 uint8_t USART3_RX_FRAME_BUFFER[USART3_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial3(&huart3,
@@ -67,16 +74,19 @@ SlimSerial slimSerial3(&huart3,
 		USART3_485_Tx_EN_GPIO_Port,
 		USART3_485_Tx_EN_GPIO_Pin,
 		USART3_TX_MODE,
-		USART3_RX_MODE);
+		USART3_RX_MODE,
+		USART3_9_BITS_MODE);
 #endif
+
 #if ENABLE_SLIMSERIAL_USART4==1
-#if PRINTF_USART == huart4
-#define USART4_TX_QUEUE_SIZE 4
-#else
-#define USART4_TX_QUEUE_SIZE 2
-#endif
+#define USART4_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART4_9_BITS_MODE == 0
 uint8_t USART4_TX_QUEUE_BUFFER[USART4_TX_FRAME_MAX_SIZE*USART4_TX_QUEUE_SIZE];
 uint8_t USART4_RX_PINGPONG_BUFFER[USART4_RX_FRAME_MAX_SIZE*2];
+#elif USART4_9_BITS_MODE == 1
+uint16_t USART4_TX_QUEUE_BUFFER[USART4_TX_FRAME_MAX_SIZE*USART4_TX_QUEUE_SIZE];
+uint16_t USART4_RX_PINGPONG_BUFFER[USART4_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART4_RX_CIRCULAR_BUFFER[USART4_RX_FRAME_MAX_SIZE*2];
 uint8_t USART4_RX_FRAME_BUFFER[USART4_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial4(&huart4,
@@ -87,16 +97,18 @@ SlimSerial slimSerial4(&huart4,
 		USART4_485_Tx_EN_GPIO_Port,
 		USART4_485_Tx_EN_GPIO_Pin,
 		USART4_TX_MODE,
-		USART4_RX_MODE);
+		USART4_RX_MODE,
+		USART4_9_BITS_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART5==1
-#if PRINTF_USART == huart5
-#define USART5_TX_QUEUE_SIZE 4
-#else
-#define USART5_TX_QUEUE_SIZE 2
-#endif
+#define USART5_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART5_9_BITS_MODE == 0
 uint8_t USART5_TX_QUEUE_BUFFER[USART5_TX_FRAME_MAX_SIZE*USART5_TX_QUEUE_SIZE];
 uint8_t USART5_RX_PINGPONG_BUFFER[USART5_RX_FRAME_MAX_SIZE*2];
+#elif USART5_9_BITS_MODE == 1
+uint16_t USART5_TX_QUEUE_BUFFER[USART5_TX_FRAME_MAX_SIZE*USART5_TX_QUEUE_SIZE];
+uint16_t USART5_RX_PINGPONG_BUFFER[USART5_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART5_RX_CIRCULAR_BUFFER[USART5_RX_FRAME_MAX_SIZE*2];
 uint8_t USART5_RX_FRAME_BUFFER[USART5_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial5(&huart5,
@@ -107,16 +119,18 @@ SlimSerial slimSerial5(&huart5,
 		USART5_485_Tx_EN_GPIO_Port,
 		USART5_485_Tx_EN_GPIO_Pin,
 		USART5_TX_MODE,
-		USART5_RX_MODE);
+		USART5_RX_MODE,
+		USART5_9_BITS_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART6==1
-#if PRINTF_USART == huart6
-#define USART6_TX_QUEUE_SIZE 4
-#else
-#define USART6_TX_QUEUE_SIZE 2
-#endif
+#define USART6_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART6_9_BITS_MODE == 0
 uint8_t USART6_TX_QUEUE_BUFFER[USART6_TX_FRAME_MAX_SIZE*USART6_TX_QUEUE_SIZE];
 uint8_t USART6_RX_PINGPONG_BUFFER[USART6_RX_FRAME_MAX_SIZE*2];
+#elif USART6_9_BITS_MODE == 1
+uint16_t USART6_TX_QUEUE_BUFFER[USART6_TX_FRAME_MAX_SIZE*USART6_TX_QUEUE_SIZE];
+uint16_t USART6_RX_PINGPONG_BUFFER[USART6_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART6_RX_CIRCULAR_BUFFER[USART6_RX_FRAME_MAX_SIZE*2];
 uint8_t USART6_RX_FRAME_BUFFER[USART6_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial6(&huart6,
@@ -127,16 +141,18 @@ SlimSerial slimSerial6(&huart6,
 		USART6_485_Tx_EN_GPIO_Port,
 		USART6_485_Tx_EN_GPIO_Pin,
 		USART6_TX_MODE,
-		USART6_RX_MODE);
+		USART6_RX_MODE,
+		USART6_9_BITS_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART7==1
-#if PRINTF_USART == huart7
-#define USART7_TX_QUEUE_SIZE 4
-#else
-#define USART7_TX_QUEUE_SIZE 2
-#endif
+#define USART7_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART7_9_BITS_MODE == 0
 uint8_t USART7_TX_QUEUE_BUFFER[USART7_TX_FRAME_MAX_SIZE*USART7_TX_QUEUE_SIZE];
 uint8_t USART7_RX_PINGPONG_BUFFER[USART7_RX_FRAME_MAX_SIZE*2];
+#elif USART7_9_BITS_MODE == 1
+uint16_t USART7_TX_QUEUE_BUFFER[USART7_TX_FRAME_MAX_SIZE*USART7_TX_QUEUE_SIZE];
+uint16_t USART7_RX_PINGPONG_BUFFER[USART7_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART7_RX_CIRCULAR_BUFFER[USART7_RX_FRAME_MAX_SIZE*2];
 uint8_t USART7_RX_FRAME_BUFFER[USART7_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial7(&huart7,
@@ -147,16 +163,18 @@ SlimSerial slimSerial7(&huart7,
 		USART7_485_Tx_EN_GPIO_Port,
 		USART7_485_Tx_EN_GPIO_Pin,
 		USART7_TX_MODE,
-		USART7_RX_MODE);
+		USART7_RX_MODE,
+		USART7_9_BITS_MODE);
 #endif
 #if ENABLE_SLIMSERIAL_USART8==1
-#if PRINTF_USART == huart8
-#define USART8_TX_QUEUE_SIZE 4
-#else
-#define USART8_TX_QUEUE_SIZE 2
-#endif
+#define USART8_TX_QUEUE_SIZE SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE
+#if USART8_9_BITS_MODE == 0
 uint8_t USART8_TX_QUEUE_BUFFER[USART8_TX_FRAME_MAX_SIZE*USART8_TX_QUEUE_SIZE];
 uint8_t USART8_RX_PINGPONG_BUFFER[USART8_RX_FRAME_MAX_SIZE*2];
+#elif USART8_9_BITS_MODE == 1
+uint16_t USART8_TX_QUEUE_BUFFER[USART8_TX_FRAME_MAX_SIZE*USART8_TX_QUEUE_SIZE];
+uint16_t USART8_RX_PINGPONG_BUFFER[USART8_RX_FRAME_MAX_SIZE*2];
+#endif
 uint8_t USART8_RX_CIRCULAR_BUFFER[USART8_RX_FRAME_MAX_SIZE*2];
 uint8_t USART8_RX_FRAME_BUFFER[USART8_RX_FRAME_MAX_SIZE];
 SlimSerial slimSerial8(&huart8,
@@ -167,106 +185,16 @@ SlimSerial slimSerial8(&huart8,
 		USART8_485_Tx_EN_GPIO_Port,
 		USART8_485_Tx_EN_GPIO_Pin,
 		USART8_TX_MODE,
-		USART8_RX_MODE);
+		USART8_RX_MODE,
+		USART8_9_BITS_MODE);
 #endif
 
-// #if ENABLE_PROXY==1
-// std::array<uint8_t,1029*2> USART_PROXY_RX_PINGPONG_BUFFER;
-// std::array<uint8_t,4096> USART_PROXY_RX_CIRCULAR_BUFFER;
-// std::array<uint8_t,1029> USART_PROXY_RX_FRAME_BUFFER;
-// #endif
-
-inline constexpr uint16_t SLIM_SERIAL_TOTAL_NUM=(ENABLE_SLIMSERIAL_USART1+ENABLE_SLIMSERIAL_USART2+ENABLE_SLIMSERIAL_USART3+ENABLE_SLIMSERIAL_USART4+ENABLE_SLIMSERIAL_USART5+ENABLE_SLIMSERIAL_USART6+ENABLE_SLIMSERIAL_USART7+ENABLE_SLIMSERIAL_USART8);
-
-
-
-
-SlimSerial *slimSerialDevices[SLIM_SERIAL_TOTAL_NUM]={
-#if ENABLE_SLIMSERIAL_USART1
-		&slimSerial1,
-#endif
-#if ENABLE_SLIMSERIAL_USART2
-		&slimSerial2,
-#endif
-#if ENABLE_SLIMSERIAL_USART3
-		&slimSerial3,
-#endif
-#if ENABLE_SLIMSERIAL_USART4
-		&slimSerial4,
-#endif
-#if ENABLE_SLIMSERIAL_USART5
-		&slimSerial5,
-#endif
-#if ENABLE_SLIMSERIAL_USART6
-		&slimSerial6,
-#endif
-#if ENABLE_SLIMSERIAL_USART7
-		&slimSerial7,
-#endif
-#if ENABLE_SLIMSERIAL_USART8
-		&slimSerial8,
-#endif
-};
-
-// std::unordered_map<UART_HandleTypeDef *,SlimSerial *> slimSerialMap={
-// #if ENABLE_SLIMSERIAL_USART1
-// 		{&huart1,&slimSerial1},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART2
-// 		{&huart2,&slimSerial2},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART3
-// 		{&huart3,&slimSerial3},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART4
-// 		{&huart4,&slimSerial4},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART5
-// 		{&huart5,&slimSerial5},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART6
-// 		{&huart6,&slimSerial6},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART7
-// 		{&huart7,&slimSerial7},
-// #endif
-// #if ENABLE_SLIMSERIAL_USART8
-// 		{&huart8,&slimSerial8},
-// #endif
-// };
-
-UART_HandleTypeDef *usartHandles[SLIM_SERIAL_TOTAL_NUM]={
-#if ENABLE_SLIMSERIAL_USART1
-		&huart1,
-#endif
-#if ENABLE_SLIMSERIAL_USART2
-		&huart2,
-#endif
-#if ENABLE_SLIMSERIAL_USART3
-		&huart3,
-#endif
-#if ENABLE_SLIMSERIAL_USART4
-		&huart4,
-#endif
-#if ENABLE_SLIMSERIAL_USART5
-		&huart5,
-#endif
-#if ENABLE_SLIMSERIAL_USART6
-		&huart6,
-#endif
-#if ENABLE_SLIMSERIAL_USART7
-		&huart7,
-#endif
-#if ENABLE_SLIMSERIAL_USART8
-		&huart8
-#endif
-};
-
+ 
 SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
-			uint8_t 		*tx_queue_buf,
+			uint16_t 		*tx_queue_buf,
 			uint16_t 		tx_queue_buf_single_size,
-			uint8_t		 tx_queue_size,
-			uint8_t   *rx_pingpong_buf,
+			uint16_t		 tx_queue_size,
+			uint16_t   *rx_pingpong_buf,
 			uint16_t   rx_pingpong_buf_half_size,
 			uint8_t   *rx_circular_buf,
 			uint16_t rx_circular_buf_size,
@@ -276,7 +204,8 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 			GPIO_TypeDef* tx_485_En_Port,
 			uint16_t tx_485_En_Pin,
 			uint8_t tx_method,
-			uint8_t rx_method)
+			uint8_t rx_method,
+			uint8_t bits_9_mode) :
 :m_rx_circular_buf(rx_circular_buf,rx_circular_buf_size),
  m_frameCallbackFuncArray{}{
 
@@ -311,6 +240,8 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_totalRxBytes=0;
 	m_totalTxFrames=0;
 	m_totalRxFrames=0;
+
+	m_9bits_mode = bits_9_mode;
   
 	//header whitelist    5A A5   or FF FF
 	addHeaderFilter(0x5A,0xA5);
@@ -461,54 +392,6 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
 
 
-SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
-
-    // std::unordered_map<UART_HandleTypeDef *,SlimSerial *>::iterator it = slimSerialMap.find(huart);
-    // return (it == slimSerialMap.end()?NULL:it->second);
-
-
-#if ENABLE_SLIMSERIAL_USART1
-    if(huart==&huart1){
-    	return &slimSerial1;
-    }
-#endif
-#if ENABLE_SLIMSERIAL_USART2
-    if(huart==&huart2){
-    	return &slimSerial2;
-    }
-#endif
-#if ENABLE_SLIMSERIAL_USART3
-	if(huart==&huart3){
-		return &slimSerial3;
-	}
-#endif
-#if ENABLE_SLIMSERIAL_USART4
-	if(huart==&huart4){
-		return &slimSerial4;
-	}
-#endif
-#if ENABLE_SLIMSERIAL_USART5
-	if(huart==&huart5){
-		return &slimSerial5;
-	}
-#endif
-#if ENABLE_SLIMSERIAL_USART6
-	if(huart==&huart6){
-		return &slimSerial6;
-	}
-#endif
-#if ENABLE_SLIMSERIAL_USART7
-	if(huart==&huart7){
-		return &slimSerial7;
-	}
-#endif
-#if ENABLE_SLIMSERIAL_USART8
-	if(huart==&huart8){
-		return &slimSerial8;
-	}
-#endif
-	return NULL;
-}
 
 
 
@@ -557,12 +440,13 @@ bool SlimSerial::applyHeaderFilter(uint8_t h1In,uint8_t h2In){
 }
 
 
-
 void SlimSerial::addAddressFilter(uint8_t address){
 	 addressFilter[addressFilter_num]=address;
 	 if(addressFilter_num<SLIMSERIAL_ADDRESS_FILTER_MAX_LEN){
 		 addressFilter_num++;
 	 }
+	 m_address = address; //set the address to be the last added address
+	 m_address_9bit = (uint16_t)(0x0100 | m_address); //set the 9bit address
 	 toggleAddressFilter(true);
 }
 void SlimSerial::toggleAddressFilter(bool filterOn){
@@ -613,11 +497,10 @@ bool SlimSerial::applyFuncodeFilter(uint8_t funcodeIn){
 }
 
 
-//void SlimSerial::toggle485Tx(bool txOn){
-//	if(Tx_EN_Port)
-//		HAL_GPIO_WritePin(Tx_EN_Port,Tx_EN_Pin,(txOn?GPIO_PIN_SET:GPIO_PIN_RESET));
-//}
-
+void SlimSerial::toggle485Tx(bool txOn){
+	if(Tx_EN_Port)
+		HAL_GPIO_WritePin(Tx_EN_Port,Tx_EN_Pin,(txOn?GPIO_PIN_SET:GPIO_PIN_RESET));
+}
 
 SD_BUF_INFO &SlimSerial::getRxFrame(){
 	return m_rx_last;
@@ -723,15 +606,31 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 	 if(m_TX_Method==SLIMSERIAL_TX_MODE_BLOCK){
 		//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
 		USART_TypeDef *uart = m_huart->Instance;
-		while(databytes-->0){
+		if(m_9bits_mode){
+			uint16_t *pbufU16=(uint16_t*)(m_tx_queue_meta.back().pdata);
+			uint16_t databytesU16=m_tx_queue_meta.back().dataBytes + 1; //for 9-bit mode, the address byte is not included in the tx dataBytes
+			while(databytesU16-->0){
 #if defined(__STM32F0xx_HAL_H)
-				uart->TDR =  (uint8_t)*pbuf&0xFF;
+				uart->TDR =  *pbufU16;
 #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
-				uart->DR =  (uint8_t)*pbuf&0xFF;
+				uart->DR =  *pbufU16;
+#endif
+				pbufU16++;
+				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
+			}
+		}
+		else{
+			while(databytes-->0){
+#if defined(__STM32F0xx_HAL_H)
+				uart->TDR =  *pbuf;
+#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+				uart->DR =  *pbuf;
 #endif
 				pbuf++;
 				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
+		    }
 		}
+		
 		if(Tx_EN_Port){
 				Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
 		}
@@ -756,22 +655,36 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 }
  
 
-SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t dataBytes) {
+SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
 	//next buffer bank
 	m_tx_buf_ind++;
 	if(m_tx_buf_ind>=m_tx_queue_size){
 		m_tx_buf_ind = 0;
 	}
 
-	//copy data
-	if(pdata!=&m_tx_queue_buf[m_tx_buf_ind*m_tx_queue_buf_single_size]){
-		memcpy(&m_tx_queue_buf[m_tx_buf_ind*m_tx_queue_buf_single_size],pdata,dataBytes);
-	}
 
+	//copy data
+	int ind = m_tx_buf_ind*m_tx_queue_buf_single_size;
+
+	if(m_9bits_mode){
+		uint16_t *pTxQueueBuf = m_tx_queue_buf + ind;
+
+		//add the address byte with the 9's bit set
+		*pTxQueueBuf++ = m_address_9bit;
+
+		//copy data from U8 to U16 buffer
+		for(int i=0;i<datalen;i++){
+			*pTxQueueBuf++ = *pdata++;
+		}
+	}
+	else{
+		memcpy((uint8_t *)(m_tx_queue_buf + ind), pdata, datalen);
+	}
+ 
 	//enqueue meta data
 	SD_BUF_INFO sd_buf_info;
-	sd_buf_info.pdata = &m_tx_queue_buf[m_tx_buf_ind*m_tx_queue_buf_single_size];
-	sd_buf_info.dataBytes= dataBytes;
+	sd_buf_info.pdata = (uint8_t *)(m_tx_queue_buf + ind);
+	sd_buf_info.dataBytes= datalen;   //for 9-bit mode, the address byte is not included in the tx dataBytes
 
 	return sd_buf_info;
 
@@ -785,21 +698,47 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *p
 	}
 
 	//assemble data
-	uint8_t *pTxFrame = &m_tx_queue_buf[m_tx_buf_ind*m_tx_queue_buf_single_size];
-	pTxFrame[0] = 0x5A;
-	pTxFrame[1] = 0xA5;
-	pTxFrame[2] = address;
-	pTxFrame[3] = payloadBytes;
-	pTxFrame[4] = fcode;
-	memcpy(&pTxFrame[5],payload,payloadBytes);
-	uint16_t crc = SD_CRC_Calculate(pTxFrame, payloadBytes + 5);
-	pTxFrame[5+payloadBytes] = (uint8_t) (crc &0xFF);
-	pTxFrame[5+payloadBytes+1] = (uint8_t)(crc >> 8)&0xFF;
+	int ind = m_tx_buf_ind*m_tx_queue_buf_single_size;
+	if(m_9bits_mode){
+		uint16_t *pTxQueueBuf = m_tx_queue_buf + ind;
+
+		//add the address byte with the 9's bit set
+		*pTxQueueBuf++ = m_address_9bit;
+
+		//add the header address and payload bytes
+		*pTxQueueBuf++ = 0x5A;
+		*pTxQueueBuf++ = 0xA5;
+		*pTxQueueBuf++ = address;
+		*pTxQueueBuf++ = payloadBytes;
+		*pTxQueueBuf++ = fcode;
+		
+		//copy data from U8 to U16 buffer
+		for(int i=0;i<payloadBytes;i++){
+			*pTxQueueBuf++ = *payload++;
+		}
+
+		//calculate CRC (not including the 9-bit address)
+		uint16_t crc = SD_CRC_Calculate_U16LB(m_tx_queue_buf + ind+1, payloadBytes + 5);
+		*pTxQueueBuf++ = (uint16_t) (crc &0xFF);
+		*pTxQueueBuf++ = (uint16_t) ((crc >> 8)&0xFF);
+	}
+	else{
+		uint8_t *pTxFrame = &m_tx_queue_buf[m_tx_buf_ind*m_tx_queue_buf_single_size];
+		pTxFrame[0] = 0x5A;
+		pTxFrame[1] = 0xA5;
+		pTxFrame[2] = address;
+		pTxFrame[3] = payloadBytes;
+		pTxFrame[4] = fcode;
+		memcpy(&pTxFrame[5],payload,payloadBytes);
+		uint16_t crc = SD_CRC_Calculate(pTxFrame, payloadBytes + 5);
+		pTxFrame[5+payloadBytes] = (uint8_t) (crc &0xFF);
+		pTxFrame[5+payloadBytes+1] = (uint8_t)(crc >> 8)&0xFF;
+	}
 
 	//enqueue meta data
 	SD_BUF_INFO sd_buf_info;
 	sd_buf_info.pdata = pTxFrame;
-	sd_buf_info.dataBytes= payloadBytes + 7;
+	sd_buf_info.dataBytes= payloadBytes + 7;  //for 9-bit mode, the address byte is not included in the tx dataBytes
 
 	return sd_buf_info;
 
@@ -978,22 +917,32 @@ void SlimSerial::txCpltCallback()
 }
 
 
-void SlimSerial::rxCpltCallback(uint16_t bytes_received)
+void SlimSerial::rxCpltCallback(uint16_t data_len)
 {
 
 	m_rx_time_start = currentTime_us();
 	m_tx_once=0;
-	m_rx_pingpong_last.pdata  = &(m_rx_pingpong_buf[m_rx_pingpong_receiving_ind]);
-	m_rx_pingpong_last.dataBytes = bytes_received;
-	m_totalRxBytes += bytes_received;
-
-
+	
 	//one producer, no need to lock
-	m_rx_circular_buf.in(m_rx_pingpong_last.pdata, m_rx_pingpong_last.dataBytes);
+	if(m_9bits_mode){
+		if(data_len > 1 && m_rx_pingpong_buf[m_rx_pingpong_receiving_ind] == m_address_9bit){
+			//valid 9 bits address received, only copy the datalen-1 bytes to the circular buffer, ignoring the 9 bits address byte
+			m_9bits_rx_error = 0;
+			m_totalRxBytes += (data_len-1);
+			m_rx_circular_buf.in_U16LB((uint16_t *)(&(m_rx_pingpong_buf[m_rx_pingpong_receiving_ind])), data_len-1);
+		}
+		else{
+			//invalid 9 bits address received, ignore the data
+			m_9bits_rx_error = 1;
+		}
+	}
+	else{
+		m_totalRxBytes += data_len;
+		m_rx_circular_buf.in((uint8_t *)(&(m_rx_pingpong_buf[m_rx_pingpong_receiving_ind])), data_len);
+	}
 
-	m_rx_pingpong_receiving_ind += m_rx_pingpong_buf_half_size;
-
-	m_rx_pingpong_receiving_ind = m_rx_pingpong_receiving_ind>=(m_rx_pingpong_buf_half_size*2)?0:m_rx_pingpong_buf_half_size;
+	//switch to the next pingpong buffer
+	m_rx_pingpong_receiving_ind  =  (m_rx_pingpong_receiving_ind==0)?m_rx_pingpong_buf_half_size:0;
 
 	/* @note  Lock treatment in interrupt callback.
 	*
@@ -1033,7 +982,7 @@ void SlimSerial::rxCpltCallback(uint16_t bytes_received)
 }
 
 
-//uint8_t serialTemp[128];
+//frame parser shouldn't care about the 9 bits mode, since it is already handled in lower transmission layer
 void SlimSerial::frameParser(){
 
 	m_parse_remainingBytes=m_rx_circular_buf.availableData();
@@ -1095,7 +1044,7 @@ void SlimSerial::frameParser(){
 					uint8_t addressIn = m_rx_circular_buf.peekAt(2);
 					if(applyAddressFilter(addressIn)){
 
-						//check address. disabled by default. Call toggleFuncodeFilter(True) to enable
+						//check funcode. disabled by default. Call toggleFuncodeFilter(True) to enable
 						uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
 						if(applyFuncodeFilter(funcodeIn)){
 
@@ -1700,19 +1649,6 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
 
-//		//change rx buffer of current serial port to dedicated buffer
-//		m_rx_circular_buf.reset(&USART_PROXY_RX_CIRCULAR_BUFFER[0],USART_PROXY_RX_CIRCULAR_BUFFER.size());
-//		m_rx_pingpong_buf = &USART_PROXY_RX_PINGPONG_BUFFER[0];
-//		m_rx_pingpong_buf_half_size = USART_PROXY_RX_PINGPONG_BUFFER.size()/2;
-//		m_rx_pingpong_receiving_ind = 0;
-//		m_rx_frame_buf =  &USART_PROXY_RX_FRAME_BUFFER[0];
-//		m_rx_frame_buf_size = USART_PROXY_RX_FRAME_BUFFER.size();
-//		m_rx_last.pdata = &USART_PROXY_RX_FRAME_BUFFER[0];
-//		m_rx_last.dataBytes = 0;
-
-		 /* Configure DMA Stream immediately */
-//		m_huart->hdmarx->Instance->NDTR = m_rx_pingpong_buf_half_size;
-//		m_huart->hdmarx->Instance->M0AR = *(uint32_t*)(&m_rx_pingpong_buf);
 
 		//change settings of  proxy serial port		
 		m_proxy_port->m_proxy_port = this;
@@ -1829,9 +1765,9 @@ void SlimSerial::setBaudrate(uint32_t baudrate){
 extern "C" {
 
 /*Redirect printf() by implementing _write  or  fputc based on different compiler*/
-#if defined(__GNUC__) && defined(PRINTF_USART)
+#if defined(__GNUC__) && defined(PRINTF_SERIAL)
 int _write(int file, char *pSrc, int len){
-	SlimSerial *slimSerialDev=getSlimSerial(&PRINTF_USART);
+	SlimSerial *slimSerialDev=getSlimSerial(&PRINTF_SERIAL);
 	if(slimSerialDev){
 		return slimSerialDev->transmitData((uint8_t *)pSrc,len);
 	}
@@ -1841,7 +1777,7 @@ int _write(int file, char *pSrc, int len){
 #elif defined (__CC_ARM)
 int fputc(int ch, FILE *f)
 {
-    HAL_UART_Transmit(&PRINTF_USART, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&PRINTF_SERIAL, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
 #endif
@@ -1860,11 +1796,11 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 
 
 /*this function would overwrite HAL's weak HAL_UARTEx_RxEventCallback for all usart*/
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t bytes_received)
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t data_len)
 {
 	SlimSerial *slimSerialDev=getSlimSerial(huart);
 	if(slimSerialDev){
-		slimSerialDev->rxCpltCallback(bytes_received);
+		slimSerialDev->rxCpltCallback(data_len);
 	}
 
 }

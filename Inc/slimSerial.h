@@ -73,10 +73,10 @@ typedef enum
   SD_USART_ERROR,
 } SD_USART_StatusTypeDef;
 
-
 typedef struct SD_BUF_TAG{
 	uint8_t *pdata;
 	uint16_t dataBytes;
+
 }SD_BUF_INFO;
 
 typedef enum
@@ -153,6 +153,7 @@ public:
 	void setRxFrameType(uint8_t rx_frame_type_num);
 	uint8_t getRxFrameType();
 
+
     void addHeaderFilter(uint8_t h1,uint8_t h2);
     void addAddressFilter(uint8_t address);
     void addFuncodeFilter(uint8_t funcode);
@@ -161,10 +162,7 @@ public:
     void toggleAddressFilter(bool filterOn=false);
 	void toggleFuncodeFilter(bool filterOn=false);
 
-    void toggle485Tx(bool txOn=true){
-    	if(Tx_EN_Port)
-    		HAL_GPIO_WritePin(Tx_EN_Port,Tx_EN_Pin,(txOn?GPIO_PIN_SET:GPIO_PIN_RESET));
-    }
+    void toggle485Tx(bool txOn=true);
 
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
@@ -187,7 +185,7 @@ public:
 
 	void start_Rx_DMA_Idle();
 	void txCpltCallback();
-	void rxCpltCallback(uint16_t);
+	void rxCpltCallback(uint16_t data_len);
 
 	uint8_t rxNeedRestart;
 
@@ -258,21 +256,20 @@ private:
 
 
 	//Tx queue buffer
-	uint8_t  *m_tx_queue_buf;
+	uint16_t  *m_tx_queue_buf;
 	uint16_t  m_tx_queue_buf_single_size;
-	uint8_t	 m_tx_queue_size;
-	uint16_t m_tx_buf_ind;
+	uint16_t  m_tx_queue_size;
+	uint16_t  m_tx_buf_ind;
 	static_queue<SD_BUF_INFO, 5> m_tx_queue_meta;
 	SD_BUF_INFO m_tx_last;
 
 	//Rx ping pong buffer
-	uint8_t  *m_rx_pingpong_buf;
+	uint16_t  *m_rx_pingpong_buf;
 	uint16_t  m_rx_pingpong_buf_half_size;
-	SD_BUF_INFO m_rx_pingpong_last;
 	uint16_t m_rx_pingpong_receiving_ind;
 
 	//rx circular buffer
-	CURCULAR_BUFFER m_rx_circular_buf;
+	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
 
 	//rx data
 	SD_BUF_INFO m_rx_last;
@@ -282,7 +279,11 @@ private:
 	//rx status record
 	SD_USART_StatusTypeDef m_rx_status;
 
-
+	//bits 9 mode
+	uint8_t m_9bits_mode; 			//0: 8 bits mode; 1: 9 bits mode
+	uint8_t m_address;  		//address
+	uint16_t m_address_9bit; 	//9 bits address, 0x0100 | address
+	uint8_t m_9bits_rx_error;
 
 	//
 	int m_totalTxFrames = 0;

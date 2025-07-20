@@ -15,10 +15,10 @@
 
 
 // C++ version
-class CURCULAR_BUFFER {
+class SLIM_CURCULAR_BUFFER {
 
 public:
-	CURCULAR_BUFFER(uint8_t *pBuf, uint16_t bufzise) {
+	SLIM_CURCULAR_BUFFER(uint8_t *pBuf, uint16_t bufzise) {
 
 		reset(pBuf, bufzise);
 	}
@@ -163,8 +163,17 @@ public:
 
 	}
 
+	static void memcpy_U16LB_2_U8(uint8_t *des, const uint16_t *src, size_t len){
+       for(size_t i=0;i<len;i++){
+    	   des[i] = (uint8_t)(src[i] & 0xFF);
+       }
+    }
 
-
+	static void memcpy_U8_2_U16LB(uint16_t *des, const uint8_t *src, size_t len){
+       for(size_t i=0;i<len;i++){
+    	   des[i] = src[i];
+       }
+    }
 
 	uint8_t		*buffer;
 	uint32_t	bufferSize;
@@ -176,11 +185,7 @@ private:
 	
 	uint32_t	mask;
 
-	static void memcpy_U16LB(uint8_t *des, const uint16_t *src, size_t len){
-       for(size_t i=0;i<len;i++){
-    	   des[i] = (uint8_t)(src[i] & 0xFF);
-       }
-    }
+
 
 	uint32_t in_overwrite(const uint8_t* pSrc, uint32_t len) {
 		uint32_t ltemp = unusedSpace();
@@ -221,8 +226,8 @@ private:
 
 		ltemp = len < tm ? len : tm;
 
-		memcpy_U16LB(buffer + off, pSrc, ltemp);
-		memcpy_U16LB(buffer, pSrc + ltemp, len - ltemp);
+		memcpy_U16LB_2_U8(buffer + off, pSrc, ltemp);
+		memcpy_U16LB_2_U8(buffer, pSrc + ltemp, len - ltemp);
 
 	}
 	void copy_out(uint8_t* pDes, uint32_t len, uint32_t off)
