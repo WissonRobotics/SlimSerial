@@ -1,7 +1,7 @@
-
-
 #ifndef SLIMSERIAL_CONFIGS_H_
 #define SLIMSERIAL_CONFIGS_H_
+
+#include "slimSerialDefines.h"
 
 /****************************** User define Zone Begin***********************/
 
@@ -23,28 +23,29 @@
 #define ENABLE_SLIMSERIAL_USART7 0 //
 #define ENABLE_SLIMSERIAL_USART8 0 //
 
-enum
-{
-    SLIMSERIAL_TX_MODE_BLOCK = 0,
-    SLIMSERIAL_TX_MODE_DMA   = 1,
-    SLIMSERIAL_TX_MODE_IT    = 2
-};
-
-enum
-{
-    SLIMSERIAL_RX_MODE_OFF 	  = 0,
-    SLIMSERIAL_RX_MODE_TASK   = 1,
-    SLIMSERIAL_RX_MODE_INT     = 2
-};
 
 
-/*
-SLIMSERIAL_FRAME_TYPE_0_ANY:  	receive any rx and trigger a rx callback based on idle line dectection.
-SLIMSERIAL_FRAME_TYPE_1:  		Frame: Header1 Header2 Src Len Func  + payloads + crc16.  Trigger a rx callback for a valid frame
-SLIMSERIAL_FRAME_TYPE_2:  		Frame: Header1 Header2 Len Func  + payloads + crc16. Trigger a rx callback for a valid frame
-SLIMSERIAL_FRAME_TYPE_3_MODBUS: Frame: MODBUS frame.  Trigger a rx callback for a valid frame
-SLIMSERIAL_FRAME_TYPE_4_NONE:  	receive any rx without triggering rx callback.  Read rx by actively call readBuffer()
-*/
+// SlimSerial Tx Mode
+// 0: Tx_blocking;	1:Tx_DMA; 		2: Tx
+// #define SLIMSERIAL_TX_MODE_BLOCK 0
+// #define SLIMSERIAL_TX_MODE_DMA   1
+// #define SLIMSERIAL_TX_MODE_IT    2
+
+
+//SlimSerial Rx Mode
+// 0: disable rx ;  1:enable rx in task;  2:enable rx in interrupt.
+// #define SLIMSERIAL_RX_MODE_OFF   0
+// #define SLIMSERIAL_RX_MODE_TASK  1
+// #define SLIMSERIAL_RX_MODE_INT   2
+
+//SlimSerial Rx Frame Type
+// SLIMSERIAL_FRAME_TYPE_0_ANY:  	receive any rx and trigger a rx callback based on idle line dectection.
+// SLIMSERIAL_FRAME_TYPE_1:  		Frame: Header1 Header2 Src Len Func  + payloads + crc16.  Trigger a rx callback for a valid frame
+// SLIMSERIAL_FRAME_TYPE_2:  		Frame: Header1 Header2 Len Func  + payloads + crc16. Trigger a rx callback for a valid frame
+// SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM: Frame: MODBUS SERVER frame.  Trigger a rx callback for a valid frame
+// SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM: Frame: MODBUS CLIENT frame.  Trigger a rx callback for a valid frame
+// SLIMSERIAL_FRAME_TYPE_NONE:  	receive any rx without triggering rx callback.  Read rx by actively call readBuffer()
+
 //define the usart's tx rx frame max size, need to be 2^n, and the 485Tx enable pin
 #if ENABLE_SLIMSERIAL_USART1 == 1
 #define USART1_TX_FRAME_MAX_SIZE   64                      //to be 2^n,  Max bytes of Tx frame
@@ -142,22 +143,6 @@ SLIMSERIAL_FRAME_TYPE_4_NONE:  	receive any rx without triggering rx callback.  
 #endif
 
 #define ENABLE_PROXY 1
-
-//default Enable rx address filter
-
-#define DEFAULT_RX_HEADER_1_BYTE1 0x5A
-#define DEFAULT_RX_HEADER_1_BYTE2 0xA5
-
-#define DEFAULT_RX_HEADER_2_BYTE1 0xFF
-#define DEFAULT_RX_HEADER_2_BYTE2 0xFF
-
-//default DISable rx address filter
-
-#define DEFAULT_RX_ADDRESS_WHITE_LIST 0xFF
-
-//default DISable rx address filter
-
-#define DEFAULT_RX_FUNCODE_WHITE_LIST 0xA2
 
 //advanced config
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     4      //default tx queue size

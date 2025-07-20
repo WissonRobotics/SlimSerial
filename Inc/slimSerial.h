@@ -8,6 +8,7 @@
 #include <functional>
 #include <slimCircularBuffer.hpp>
 #include "static_queue.hpp"
+#include "slimSerialDefines.h"
 #include "slimSerial_Configs.h"
 
 #define INTERNAL_MAX_FRAME_SIZE 1024
@@ -79,17 +80,7 @@ typedef struct SD_BUF_TAG{
 
 }SD_BUF_INFO;
 
-typedef enum
-{
-  SLIMSERIAL_FRAME_TYPE_0_ANY	=0,
-  SLIMSERIAL_FRAME_TYPE_1 		=1,
-  SLIMSERIAL_FRAME_TYPE_2 		=2,
-  SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM =3,
-  SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM =4,
 
-  SLIMSERIAL_FRAME_TYPE_NONE = 99
-}SLIMSERIAL_FRAME_TYPE_ENUM;
-;
 typedef enum
 {
   SLIMSERIAL_TXRX_NORMAL = 0,
@@ -111,20 +102,21 @@ class SlimSerial{
 public:
 
 	SlimSerial(UART_HandleTypeDef *uartHandle,
-			uint8_t 		*tx_queue_buf,
+			uint16_t 		*tx_queue_buf,
 			uint16_t 		tx_queue_buf_single_size,
-			uint8_t		 tx_queue_meta_size,
-			uint8_t   *rx_pingpong_buf,
+			uint16_t		 tx_queue_meta_size,
+			uint16_t   *rx_pingpong_buf,
 			uint16_t   rx_pingpong_buf_half_size,
 			uint8_t   *rx_circular_buf,
 			uint16_t  rx_circular_buf_size,
 			uint8_t  *rx_frame,
 			uint16_t rx_frame_size,
-			uint8_t rx_frame_type= 1,
-			GPIO_TypeDef* tx_485_En_Port = NULL,
-			uint16_t tx_485_En_Pin = 0,
-			uint8_t tx_method = 1,
-			uint8_t rx_method = 1);
+			uint8_t rx_frame_type,
+			GPIO_TypeDef* tx_485_En_Port,
+			uint16_t tx_485_En_Pin,
+			uint8_t tx_method,
+			uint8_t rx_method,
+			uint8_t nine_bits_mode);
 
 	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
@@ -260,7 +252,7 @@ private:
 	uint16_t  m_tx_queue_buf_single_size;
 	uint16_t  m_tx_queue_size;
 	uint16_t  m_tx_buf_ind;
-	static_queue<SD_BUF_INFO, 5> m_tx_queue_meta;
+	static_queue<SD_BUF_INFO, 3> m_tx_queue_meta;
 	SD_BUF_INFO m_tx_last;
 
 	//Rx ping pong buffer
@@ -317,10 +309,10 @@ private:
 
 	//synchronization tools
 	bool writeLocked = false;
-	SemaphoreHandle_t writeMtx;
-	StaticSemaphore_t writeMtxBuffer;
-	SemaphoreHandle_t readMtx;
-	StaticSemaphore_t readMtxBuffer;
+//	SemaphoreHandle_t writeMtx;
+//	StaticSemaphore_t writeMtxBuffer;
+//	SemaphoreHandle_t readMtx;
+//	StaticSemaphore_t readMtxBuffer;
 
 //    std::mutex txrxMtx;
 //    std::mutex ackMtx;
