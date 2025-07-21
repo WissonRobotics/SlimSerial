@@ -504,14 +504,15 @@ inline SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 
 	//if not found, return NULL
 	return NULL;
-
+	
 }
 
-//4bit address
-SD_USART_StatusTypeDef SlimSerial::config9bitAddressMute(uint8_t address_4_bits){
+//only support 4bit address
+SD_USART_StatusTypeDef SlimSerial::configAddressMute(){
 	HAL_StatusTypeDef ret;
-	uint8_t address = address_4_bits & 0x0F; //mask to 4 bits
-	if ((ret=HAL_MultiProcessor_Init(m_huart,m_address,UART_WAKEUPMETHOD_ADDRESSMARK)) != HAL_OK)
+	m_address_4bit = m_address & 0x0F; 			//mask to 4 bits
+	m_address_9bit = 0x0100 | m_address_4bit; 	//9 bits address = 0x0100 | m_address_4bit
+	if ((ret=HAL_MultiProcessor_Init(m_huart,m_address_4bit,UART_WAKEUPMETHOD_ADDRESSMARK)) != HAL_OK)
 	{
 		//error handling
 
@@ -667,12 +668,12 @@ void SlimSerial::addAddressFilter(uint8_t address){
 		 addressFilter_num++;
 	 }
 	 m_address = address; //set the address to be the last added address
-	 m_address_9bit = (uint16_t)(0x0100 | m_address); //set the 9bit address
+
 	 toggleAddressFilter(true);
 
 	 if(m_9bits_mode){
-		 //if 9-bit mode, set the address mute
-		 config9bitAddressMute(m_address);//the address itself is 8 bit in 9-bit mode, so the address is 0-255
+		 //set the address mute, only support 4 bits address
+		 configAddressMute((m_address&0x0F));
 	 }
 
 }

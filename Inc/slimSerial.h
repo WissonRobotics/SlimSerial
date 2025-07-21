@@ -159,7 +159,7 @@ public:
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
-	SD_USART_StatusTypeDef config9bitAddressMute(uint8_t address);
+	SD_USART_StatusTypeDef configAddressMute(uint8_t address);
 
 	int8_t debugOutputEnable;
 
@@ -276,7 +276,8 @@ private:
 	//bits 9 mode
 	uint8_t m_9bits_mode; 			//0: 8 bits mode; 1: 9 bits mode
 	uint8_t m_address;  		//address
-	uint16_t m_address_9bit; 	//9 bits address, 0x0100 | address
+	uint16_t m_address_4bit; 	//4 bits address, 0x0F & m_address
+	uint16_t m_address_9bit; 	//9 bits address, 0x0100 | m_address_4bit
 	uint8_t m_9bits_rx_error;
 
 	//
