@@ -159,6 +159,8 @@ public:
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
+	SD_USART_StatusTypeDef config9bitAddressMute(uint8_t address);
+
 	int8_t debugOutputEnable;
 
 	//usart

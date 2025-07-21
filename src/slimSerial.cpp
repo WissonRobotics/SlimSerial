@@ -516,6 +516,23 @@ inline SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 
 }
 
+SD_USART_StatusTypeDef SlimSerial::config9bitAddressMute(uint8_t address){
+	HAL_StatusTypeDef ret;
+	if ((ret=HAL_MultiProcessor_Init(m_huart,m_address,UART_WAKEUPMETHOD_ADDRESSMARK)) != HAL_OK)
+	{
+		//error handling
+
+
+		return SD_USART_ERROR;
+	} else {
+		HAL_MultiProcessorEx_AddressLength_Set(m_huart,UART_ADDRESS_DETECT_7B);
+		HAL_MultiProcessor_EnableMuteMode(m_huart);
+		HAL_MultiProcessor_EnterMuteMode(m_huart);
+		return SD_USART_OK;
+	}
+
+}
+
  HAL_StatusTypeDef SlimSerial::createRxTasks(){
 
 /********* prevent name conversion warning by changing thread name from char* to const char*    ****************/
@@ -658,6 +675,12 @@ void SlimSerial::addAddressFilter(uint8_t address){
 	 m_address = address; //set the address to be the last added address
 	 m_address_9bit = (uint16_t)(0x0100 | m_address); //set the 9bit address
 	 toggleAddressFilter(true);
+
+	 if(m_9bits_mode){
+		 //if 9-bit mode, set the address mute
+		 config9bitAddressMute(m_address);//the address itself is 8 bit in 9-bit mode, so the address is 0-255
+	 }
+
 }
 void SlimSerial::toggleAddressFilter(bool filterOn){
 	addressFilterOn = filterOn;
@@ -1161,11 +1184,12 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 	
 	//one producer, no need to lock
 	if(m_9bits_mode){
-		if(data_len > 1 && m_rx_pingpong_buf[m_rx_pingpong_receiving_ind] == m_address_9bit){
+		uint16_t *pbufU16 = ((uint16_t *)m_rx_pingpong_buf)+m_rx_pingpong_receiving_ind;
+		if(data_len > 1 && (*pbufU16 == m_address_9bit)){
 			//valid 9 bits address received, only copy the datalen-1 bytes to the circular buffer, ignoring the 9 bits address byte
 			m_9bits_rx_error = 0;
 			m_totalRxBytes += (data_len-1);
-			m_rx_circular_buf.in_U16LB(((uint16_t *)m_rx_pingpong_buf)+m_rx_pingpong_receiving_ind, data_len-1);
+			m_rx_circular_buf.in_U16LB(pbufU16+1, data_len-1);
 		}
 		else{
 			//invalid 9 bits address received, ignore the data
@@ -1173,8 +1197,9 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 		}
 	}
 	else{
+		uint8_t *pbufU8 = ((uint8_t *)m_rx_pingpong_buf)+m_rx_pingpong_receiving_ind;
 		m_totalRxBytes += data_len;
-		m_rx_circular_buf.in(((uint8_t *)m_rx_pingpong_buf)+m_rx_pingpong_receiving_ind, data_len);
+		m_rx_circular_buf.in(pbufU8, data_len);
 	}
 
 	//switch to the next pingpong buffer
