@@ -463,16 +463,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 #if ENABLE_PROXY==1
 	m_proxy_port = NULL;
  	m_last_baudrate = 0;
- 
-	m_original_rx_pingpong_buf = m_rx_pingpong_buf;
-	m_original_rx_pingpong_buf_half_size = m_rx_pingpong_buf_half_size;
- 
-	m_original_rx_frame_buf = m_rx_frame_buf;
-	m_original_rx_frame_buf_size=m_rx_frame_buf_size;
-    
- 
-	m_original_rx_circular_buf = m_rx_circular_buf.buffer;
-	m_original_rx_circular_buf_size = m_rx_circular_buf.bufferSize;
+
 #endif
 
 	//init rx state
