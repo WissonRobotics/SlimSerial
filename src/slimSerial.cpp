@@ -827,50 +827,69 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 
 	toggle485Tx(true);
 	HAL_StatusTypeDef ret=HAL_OK;
-	uint8_t *pbuf=m_tx_queue_meta.back().pdata;
-	uint16_t databytes=m_tx_queue_meta.back().dataBytes;
 
-	 if(m_TX_Method==SLIMSERIAL_TX_MODE_BLOCK){
-		//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
-		USART_TypeDef *uart = m_huart->Instance;
-		if(m_9bits_mode){
-			uint16_t *pbufU16=(uint16_t*)(m_tx_queue_meta.back().pdata);
-			uint16_t databytesU16=m_tx_queue_meta.back().dataBytes + 1; //for 9-bit mode, the address byte is not included in the tx dataBytes
-			while(databytesU16-->0){
-#if defined(__STM32F0xx_HAL_H)
-				uart->TDR =  *pbufU16;
-#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
-				uart->DR =  *pbufU16;
-#endif
-				pbufU16++;
-				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
-			}
-		}
-		else{
+	if(m_9bits_mode){
+			uint16_t *pbuf=(uint16_t*)(m_tx_queue_meta.back().pdata);
+			uint16_t databytes=m_tx_queue_meta.back().dataBytes + 1; //for 9-bit mode, the address byte is not included in the tx dataBytes
+		 if(m_TX_Method==SLIMSERIAL_TX_MODE_BLOCK){
+			//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
+			USART_TypeDef *uart = m_huart->Instance;
+
+
 			while(databytes-->0){
-#if defined(__STM32F0xx_HAL_H)
+	#if defined(__STM32F0xx_HAL_H)
 				uart->TDR =  *pbuf;
-#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+	#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
 				uart->DR =  *pbuf;
-#endif
+	#endif
 				pbuf++;
 				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
-		    }
+			}
+
+
+			if(Tx_EN_Port){
+					Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
+			}
+			txCpltCallback();
+
 		}
-		
-		if(Tx_EN_Port){
-				Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
+		else if(m_TX_Method==SLIMSERIAL_TX_MODE_DMA){
+			ret=HAL_UART_Transmit_DMA(m_huart,(const uint8_t *)pbuf,databytes);
 		}
+		else if(m_TX_Method==SLIMSERIAL_TX_MODE_IT){
+			ret=HAL_UART_Transmit_IT(m_huart,(const uint8_t *)pbuf,databytes);
+		}
+	}
+	else{
+		uint8_t *pbuf=m_tx_queue_meta.back().pdata;
+		uint16_t databytes=m_tx_queue_meta.back().dataBytes;
+		 if(m_TX_Method==SLIMSERIAL_TX_MODE_BLOCK){
+			//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
+			USART_TypeDef *uart = m_huart->Instance;
+
+			while(databytes-->0){
+ #if defined(__STM32F0xx_HAL_H)
+				uart->TDR =  *pbuf;
+ #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+				uart->DR =  *pbuf;
+ #endif
+				pbuf++;
+				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
+			}
+
+			if(Tx_EN_Port){
+					Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
+			}
 		txCpltCallback();
 
+		}
+		else if(m_TX_Method==SLIMSERIAL_TX_MODE_DMA){
+			ret=HAL_UART_Transmit_DMA(m_huart,pbuf,databytes);
+		}
+		else if(m_TX_Method==SLIMSERIAL_TX_MODE_IT){
+			ret=HAL_UART_Transmit_IT(m_huart,pbuf,databytes);
+		}
 	}
-	else if(m_TX_Method==SLIMSERIAL_TX_MODE_DMA){
-		ret=HAL_UART_Transmit_DMA(m_huart,pbuf,databytes);
-	}
-	else if(m_TX_Method==SLIMSERIAL_TX_MODE_IT){
-		ret=HAL_UART_Transmit_IT(m_huart,pbuf,databytes);
-	}
-
 
 	if(ret==HAL_OK || (ret==HAL_BUSY && !m_tx_queue_meta.empty())){
 
