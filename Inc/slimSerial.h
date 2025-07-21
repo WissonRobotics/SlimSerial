@@ -159,7 +159,7 @@ public:
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
-	SD_USART_StatusTypeDef configAddressMute(uint8_t address);
+	SD_USART_StatusTypeDef configAddressMute();
 
 	int8_t debugOutputEnable;
 
