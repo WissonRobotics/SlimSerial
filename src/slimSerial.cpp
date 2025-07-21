@@ -508,24 +508,44 @@ inline SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 }
 
 //only support 4bit address
-SD_USART_StatusTypeDef SlimSerial::configAddressMute(){
-	HAL_StatusTypeDef ret;
-	m_address_4bit = m_address & 0x0F; 			//mask to 4 bits
-	m_address_9bit = 0x0100 | m_address_4bit; 	//9 bits address = 0x0100 | m_address_4bit
-	if ((ret=HAL_MultiProcessor_Init(m_huart,m_address_4bit,UART_WAKEUPMETHOD_ADDRESSMARK)) != HAL_OK)
-	{
-		//error handling
+SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t rx_address){
 
+	//check 9bit mode bit is set
+	if(m_huart->Init.WordLength != UART_WORDLENGTH_9B){
 
-		return SD_USART_ERROR;
-	} else {
-#if defined(__STM32F0xx_HAL_H)
-		HAL_MultiProcessor_EnableMuteMode(m_huart);
-#endif
-		HAL_MultiProcessor_EnterMuteMode(m_huart);
-		return SD_USART_OK;
+		Error_Handler();
 	}
 
+	//check DMA to be 16bit
+	if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
+	   m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD){
+		Error_Handler();
+	}
+
+	//
+	m_9bits_mode_address_rx = rx_address & 0x0F; 			//mask to 4 bits
+
+	if (HAL_MultiProcessor_Init(m_huart,m_9bits_mode_address_rx,UART_WAKEUPMETHOD_ADDRESSMARK) != HAL_OK)
+	{
+		//error handling
+		m_9bits_mode_error = 1;
+		Error_Handler();
+	}
+
+	m_9bits_mode_error = 0;
+#if defined(__STM32F0xx_HAL_H)
+	HAL_MultiProcessor_EnableMuteMode(m_huart);
+#endif
+	HAL_MultiProcessor_EnterMuteMode(m_huart);
+
+	return SD_USART_OK;
+
+}
+
+//only support 4bit address
+void SlimSerial::set9bitTxAddress(uint8_t tx_address){
+
+	m_9bits_mode_address_tx = tx_address & 0x0F; 			//mask to 4 bits
 }
 
  HAL_StatusTypeDef SlimSerial::createRxTasks(){
@@ -670,11 +690,6 @@ void SlimSerial::addAddressFilter(uint8_t address){
 	 m_address = address; //set the address to be the last added address
 
 	 toggleAddressFilter(true);
-
-	 if(m_9bits_mode){
-		 //set the address mute, only support 4 bits address
-		 configAddressMute();
-	 }
 
 }
 void SlimSerial::toggleAddressFilter(bool filterOn){
@@ -920,7 +935,7 @@ SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
 		sd_buf_info.pdata = (uint8_t *)pBuf_U16;
 
 		//add the address byte with the 9's bit set
-		*pBuf_U16++ = m_address_9bit;
+		*pBuf_U16++ =  (uint16_t)(m_9bits_mode_address_tx | 0x100); //set the 9th bit
 
 		//copy data from U8 to U16 buffer
 		for(int i=0;i<datalen;i++){
@@ -959,7 +974,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *p
 		sd_buf_info.pdata = (uint8_t *)pBuf_U16;
 
 		//add the address byte with the 9's bit set
-		*pBuf_U16++ = m_address_9bit;
+		*pBuf_U16++ = (uint16_t)(m_9bits_mode_address_tx | 0x100);;
 
 		//add the header address and payload bytes
 		*pBuf_U16++ = 0x5A;
@@ -1199,15 +1214,15 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 	//one producer, no need to lock
 	if(m_9bits_mode){
 		uint16_t *pbufU16 = ((uint16_t *)m_rx_pingpong_buf)+m_rx_pingpong_receiving_ind;
-		if(data_len > 1 && (*pbufU16 == m_address_9bit)){
+		if(data_len > 1 && ((*pbufU16) == (uint16_t)(m_9bits_mode_address_rx | 0x100))){
 			//valid 9 bits address received, only copy the datalen-1 bytes to the circular buffer, ignoring the 9 bits address byte
-			m_9bits_rx_error = 0;
+			m_9bits_mode_error = 0;
 			m_totalRxBytes += (data_len-1);
 			m_rx_circular_buf.in_U16LB(pbufU16+1, data_len-1);
 		}
 		else{
 			//invalid 9 bits address received, ignore the data
-			m_9bits_rx_error = 1;
+			m_9bits_mode_error = 1;
 		}
 	}
 	else{
