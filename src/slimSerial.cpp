@@ -516,8 +516,10 @@ inline SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 
 }
 
-SD_USART_StatusTypeDef SlimSerial::config9bitAddressMute(uint8_t address){
+//4bit address
+SD_USART_StatusTypeDef SlimSerial::config9bitAddressMute(uint8_t address_4_bits){
 	HAL_StatusTypeDef ret;
+	uint8_t address = address_4_bits & 0x0F; //mask to 4 bits
 	if ((ret=HAL_MultiProcessor_Init(m_huart,m_address,UART_WAKEUPMETHOD_ADDRESSMARK)) != HAL_OK)
 	{
 		//error handling
@@ -525,8 +527,9 @@ SD_USART_StatusTypeDef SlimSerial::config9bitAddressMute(uint8_t address){
 
 		return SD_USART_ERROR;
 	} else {
-		HAL_MultiProcessorEx_AddressLength_Set(m_huart,UART_ADDRESS_DETECT_7B);
+#if defined(__STM32F0xx_HAL_H)
 		HAL_MultiProcessor_EnableMuteMode(m_huart);
+#endif
 		HAL_MultiProcessor_EnterMuteMode(m_huart);
 		return SD_USART_OK;
 	}
