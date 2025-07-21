@@ -2029,12 +2029,7 @@ extern "C" {
 /*Redirect printf() by implementing _write  or  fputc based on different compiler*/
 #if defined(__GNUC__) && defined(PRINTF_SERIAL)
 int _write(int file, char *pSrc, int len){
-
-	if(PRINTF_SERIAL){
-		return PRINTF_SERIAL.transmitData((uint8_t *)pSrc,len);
-	}
-	else
-		return 0;
+	return PRINTF_SERIAL.transmitData((uint8_t *)pSrc,len);
 }
 #elif defined (__CC_ARM)
 int fputc(int ch, FILE *f)
