@@ -1982,23 +1982,6 @@ void SlimSerial::disableProxy(){
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 		m_proxy_port->m_proxy_port = NULL;
 
-		//restore rx buffer of current serial port
-//		m_rx_circular_buf.reset(m_original_rx_circular_buf,m_original_rx_circular_buf_size);
-//		m_rx_pingpong_buf = m_original_rx_pingpong_buf;
-//		m_rx_pingpong_buf_half_size = m_original_rx_pingpong_buf_half_size;
-//		m_rx_pingpong_receiving_ind = 0;
-//		m_rx_frame_buf =  m_original_rx_frame_buf;
-//		m_rx_frame_buf_size = m_original_rx_frame_buf_size;
-//		m_rx_last.pdata = m_original_rx_frame_buf;
-//		m_rx_last.dataBytes = 0;
-
-//		m_huart->hdmarx->Instance->NDTR = m_rx_pingpong_buf_half_size;
-//		m_huart->hdmarx->Instance->M0AR = *(uint32_t*)(&m_rx_pingpong_buf);
-
-//		rxNeedRestart=1;
-//		if (rxThreadID != NULL) {
-//			xTaskNotify((TaskHandle_t)(rxThreadID), 1, eSetValueWithOverwrite);
-//		}
 	}
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;

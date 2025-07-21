@@ -159,7 +159,8 @@ public:
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
-	SD_USART_StatusTypeDef configAddressMute();
+	SD_USART_StatusTypeDef config9bitMode(uint8_t address);
+	void set9bitTxAddress(uint8_t address);
 
 	int8_t debugOutputEnable;
 
@@ -198,14 +199,6 @@ public:
 	SlimSerial *m_proxy_port;
 
 	uint32_t m_last_baudrate;  
-	uint8_t *m_original_rx_pingpong_buf;
-	uint16_t m_original_rx_pingpong_buf_half_size;
- 
-	uint8_t *m_original_rx_frame_buf;
-	uint16_t m_original_rx_frame_buf_size;
-
-	uint8_t *m_original_rx_circular_buf;
-	uint16_t m_original_rx_circular_buf_size;
 #endif
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;
@@ -273,12 +266,13 @@ private:
 	//rx status record
 	SD_USART_StatusTypeDef m_rx_status;
 
+	uint8_t m_address;  				//address in frame
+
 	//bits 9 mode
-	uint8_t m_9bits_mode; 			//0: 8 bits mode; 1: 9 bits mode
-	uint8_t m_address;  		//address
-	uint16_t m_address_4bit; 	//4 bits address, 0x0F & m_address
-	uint16_t m_address_9bit; 	//9 bits address, 0x0100 | m_address_4bit
-	uint8_t m_9bits_rx_error;
+	uint8_t m_9bits_mode; 				//0: 8 bits mode; 1: 9 bits mode
+	uint8_t m_9bits_mode_address_rx; 	//rx address for 9 bits mode
+	uint8_t m_9bits_mode_address_tx; 	//tx address for 9 bits mode
+	uint8_t m_9bits_mode_error;
 
 	//
 	int m_totalTxFrames = 0;
