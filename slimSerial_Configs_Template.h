@@ -60,8 +60,8 @@
 #endif
 
 #if ENABLE_SLIMSERIAL_USART2 == 1
-#define USART2_TX_FRAME_MAX_SIZE   512                         //to be 2^n,  Max bytes of Tx frame
-#define USART2_RX_FRAME_MAX_SIZE   2048                         //to be 2^n,  Max bytes of Rx frame
+#define USART2_TX_FRAME_MAX_SIZE   128                         //to be 2^n,  Max bytes of Tx frame
+#define USART2_RX_FRAME_MAX_SIZE   128                         //to be 2^n,  Max bytes of Rx frame
 #define USART2_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM     //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART2_485_Tx_EN_GPIO_Port RS485_EN2_GPIO_Port         //set to NULL if not used
 #define USART2_485_Tx_EN_GPIO_Pin  RS485_EN2_Pin               //set to NULL if not used
@@ -93,7 +93,7 @@
 #endif
 
 #if ENABLE_SLIMSERIAL_USART5 == 1
-#define USART5_TX_FRAME_MAX_SIZE   512                     //to be 2^n,  Max bytes of Tx frame
+#define USART5_TX_FRAME_MAX_SIZE   1024                     //to be 2^n,  Max bytes of Tx frame
 #define USART5_RX_FRAME_MAX_SIZE   2048                      //to be 2^n,  Max bytes of Rx frame
 #define USART5_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART5_485_Tx_EN_GPIO_Port NULL                    //set to NULL if not used
@@ -141,16 +141,28 @@
 #if ENABLE_SLIMSERIAL_MICRO_SECONDS
 #define HAL_TICK_TIM TIM6 //The timer used for HAL_Tick()
 #endif
+ 
 
-#define ENABLE_PROXY 1
+//advanced config for F0
+#if defined(__STM32F0xx_HAL_H)
+#define ENABLE_PROXY                         0      //0:disable proxy mode 1:enable proxy mode
+#define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
+#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       256    // rx task stack size
+#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
+#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     2
+#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    2
+#define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    2
 
-//advanced config
-#define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     4      //default tx queue size
+//advanced config for F4
+#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+#define ENABLE_PROXY                         1    //0:disable proxy mode 1:enable proxy mode
+#define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     3      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       1024 // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 5    //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
+#endif
 
 
 #endif /* SLIMSERIAL_CONFIGS_H_ */
