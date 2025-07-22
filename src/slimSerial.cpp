@@ -469,9 +469,6 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
 #endif
 
-	//init rx state
-//	toggle485Tx(false);
-
 	/* definition and creation of PCInTask */
 	if(m_rx_mode>0){
 		createRxTasks();
@@ -510,66 +507,69 @@ inline SlimSerial *getSlimSerial(UART_HandleTypeDef *huart){
 	
 }
 
+SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
+ 	//check 9bit mode bit is set
+ 	if(m_9bits_mode==1){
+ 		if(m_huart->Init.WordLength != UART_WORDLENGTH_9B){
+
+ 			//otherwise, set to 9bit mode
+ 			m_huart->Init.WordLength = UART_WORDLENGTH_9B;
+ 			if (HAL_UART_Init(m_huart) != HAL_OK)
+ 			{
+ 				//error handling
+ 				m_9bits_mode_error = 1;
+ 				return SD_USART_ERROR;
+ 			}
+ 		}
+
+ 		//check tx DMA to be 16bit
+ 		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
+ 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
+ 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
+ 			   ){
+ 				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+ 				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+
+
+ 				if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
+ 				{
+ 					//error handling
+ 					m_9bits_mode_error = 1;
+ 					return SD_USART_ERROR;
+ 				}
+
+ 			}
+ 		}
+
+
+ 		//check rx DMA to be 16bit
+ 		//if rx is enabled, it must use DMA
+ 		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
+ 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
+ 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
+ 			   ){
+
+ 				//otherwise, set to 16bit mode
+ 				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+ 				m_huart->hdmarx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+
+
+ 				if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
+ 				{
+ 					//error handling
+ 					m_9bits_mode_error = 1;
+ 					return SD_USART_ERROR;
+ 				}
+ 			}
+ 		}
+ 	}
+ 	return SD_USART_OK;
+}
+
 //only support 4bit address
 SD_USART_StatusTypeDef SlimSerial::config9bitRxAddress(uint8_t rx_address){
 
-	//check 9bit mode bit is set
-	if(m_huart->Init.WordLength != UART_WORDLENGTH_9B){
 
-		//otherwise, set to 9bit mode
-
-
-		m_huart->Init.WordLength = UART_WORDLENGTH_9B;
-		if (HAL_UART_Init(m_huart) != HAL_OK)
-		{
-			//error handling
-			m_9bits_mode_error = 1;
-			Error_Handler();
-		}
-	}
-
-	//check tx DMA to be 16bit
-	if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
-		if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
-		   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
-		   ){
-
-			//otherwise, set to 16bit mode
-			m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-			m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-
-
-			if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
-			{
-				//error handling
-				m_9bits_mode_error = 1;
-				Error_Handler();
-			}
-			Error_Handler();
-		}
-	}
-
-
-	//check rx DMA to be 16bit
-	//if rx is enabled, it must use DMA
-	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
-		if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
-		   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
-		   ){
-
-			//otherwise, set to 16bit mode
-			m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-			m_huart->hdmarx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-
-
-			if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
-			{
-				//error handling
-				m_9bits_mode_error = 1;
-				Error_Handler();
-			}
-		}
-	}
 	//
 	m_9bits_mode_address_rx = rx_address & 0x0F; 			//mask to 4 bits
 
@@ -1869,6 +1869,8 @@ void SlimSerial::rxHandlerThread() {
 	rxThreadID = (uint32_t *)osThreadGetId();
 
 	osDelay(100);
+	config9bitMode();
+	osDelay(10);
 	start_Rx_DMA_Idle();
 
 	/* Infinite loop */
