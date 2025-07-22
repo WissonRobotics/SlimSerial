@@ -159,8 +159,8 @@ public:
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
-	SD_USART_StatusTypeDef config9bitMode(uint8_t address);
-	void set9bitTxAddress(uint8_t address);
+	SD_USART_StatusTypeDef config9bitRxAddress(uint8_t address);
+	void config9bitTxAddress(uint8_t address);
 
 	int8_t debugOutputEnable;
 
@@ -273,6 +273,7 @@ private:
 	uint8_t m_9bits_mode_address_rx; 	//rx address for 9 bits mode
 	uint8_t m_9bits_mode_address_tx; 	//tx address for 9 bits mode
 	uint8_t m_9bits_mode_error;
+	bool m_enable_rx_wake_up;
 
 	//
 	int m_totalTxFrames = 0;
@@ -284,14 +285,14 @@ private:
 	bool receivedACK;
 
 	//rx enable
-	uint8_t m_rx_method; //0: no rx; 1:handle rx frame in task;  2:handle rx frame in interrupt.
+	uint8_t m_rx_mode; //0: no rx; 1:handle rx frame in task;  2:handle rx frame in interrupt.
 
 	//485 tx enable ping
 	GPIO_TypeDef* Tx_EN_Port;
 	uint16_t Tx_EN_Pin;
 
     //tx method.
-    uint8_t m_TX_Method;//0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
+    uint8_t m_tx_mode;//0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
 
 
 	//frame type
