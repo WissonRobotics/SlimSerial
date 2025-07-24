@@ -366,6 +366,10 @@ SlimSerial slimSerial8(&huart8,
 		USART8_9_BITS_MODE);
 #endif
 
+#if ENABLE_PROXY==1
+uint16_t SlimSerial::m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]={}; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
+#endif
+
  
 SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 			uint16_t 		*tx_queue_buf,
@@ -958,49 +962,59 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 		return SD_USART_ERROR;
 	}
 }
- 
 
-SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
-
+SD_BUF_INFO SlimSerial::bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen) {
 	SD_BUF_INFO sd_buf_info;
-
-	//next buffer bank
-	m_tx_buf_ind++;
-	if(m_tx_buf_ind>=m_tx_queue_size){
-		m_tx_buf_ind = 0;
-	}
-
-
-	//copy data
-	int ind = m_tx_buf_ind*m_tx_queue_buf_single_size;
-
 	if(m_9bits_mode){
-		uint16_t *pBuf_U16 = ((uint16_t *)m_tx_queue_buf) + ind;
-		sd_buf_info.pdata = (uint8_t *)pBuf_U16;
+		uint16_t *pBuf_U16 = (uint16_t *)pDes;
 
 		//add the address byte with the 9's bit set
 		*pBuf_U16++ =  (uint16_t)(m_9bits_mode_address_tx | 0x100); //set the 9th bit
 
 		//copy data from U8 to U16 buffer
 		for(int i=0;i<datalen;i++){
-			*pBuf_U16++ = *pdata++;
+			*pBuf_U16++ = *pSrc++;
 		}
 
+		sd_buf_info.pdata = pDes;
 		sd_buf_info.dataBytes= datalen;   //for 9-bit mode, the address byte is not included in the tx dataBytes
 
 	}
 	else{
-		uint8_t *pBuf_U8 =((uint8_t *)m_tx_queue_buf) + ind;
-		sd_buf_info.pdata =pBuf_U8;
+		uint8_t *pBuf_U8 =(uint8_t *)pDes;
 
 		//directly copy data from U8 to U8 buffer
-		memcpy(pBuf_U8, pdata, datalen);
+		memcpy(pBuf_U8, pSrc, datalen);
 
+		sd_buf_info.pdata = pDes;
 		sd_buf_info.dataBytes= datalen;
 
 	}
  
 	return sd_buf_info;
+}
+
+
+SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
+
+	//internal next buffer bank
+	m_tx_buf_ind++;
+	if(m_tx_buf_ind>=m_tx_queue_size){
+		m_tx_buf_ind = 0;
+	}
+
+	//copy data
+	int ind = m_tx_buf_ind*m_tx_queue_buf_single_size;
+
+	if(m_9bits_mode){
+		uint16_t *pBuf_U16 = ((uint16_t *)m_tx_queue_buf) + ind;
+		return bufferDataTo((uint8_t *)pBuf_U16, pdata, datalen);
+	}
+	else{
+		uint8_t *pBuf_U8 =((uint8_t *)m_tx_queue_buf) + ind;
+		return bufferDataTo((uint8_t *)pBuf_U8, pdata, datalen);
+
+	}
 }
 
 SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes) {
@@ -1380,10 +1394,12 @@ void SlimSerial::frameParser(){
 #if ENABLE_PROXY==1
 										if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
 											//enable proxy
-											if(m_rx_last.dataBytes==12){
-												uint8_t proxyPortIndex_ =  m_rx_last.pdata[5] ;
-												uint32_t proxyPortBaudrate_= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
-												enableProxy(proxyPortIndex_,proxyPortBaudrate_);
+											if(m_rx_last.dataBytes==14){
+												uint8_t proxyPortIndex =  m_rx_last.pdata[5] ;
+												uint32_t proxyPortBaudrate= m_rx_last.pdata[6] | ((uint32_t)m_rx_last.pdata[7])<<8 | ((uint32_t)m_rx_last.pdata[8])<<16 | ((uint32_t)m_rx_last.pdata[9])<<24;
+												uint8_t enable_9bits_proxy = m_rx_last.pdata[10];
+												uint8_t proxy_9bit_address = m_rx_last.pdata[11];
+												enableProxy(proxyPortIndex,proxyPortBaudrate,enable_9bits_proxy,proxy_9bit_address);
 											}
 
 										}
@@ -1889,14 +1905,18 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 }
 #if ENABLE_PROXY==1
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
-  
-	//direct enqueue without buffering to tx
-	SD_BUF_INFO sd_buf_info={pData,databytes};
+	//if current port is in 9 bits mode, this is the downstream port, we just transmit the data to the upstream port directly
+	if(m_9bits_mode){
+		m_proxy_port->transmitDataLL(pData,databytes);
+	}
+	else{//otherwise, we may need to use a static larger buffer to support large frame size of YModem
+		SD_BUF_INFO sd_buf_info = bufferDataTo((uint8_t *)m_proxy_buffer, pData, databytes);
 
-	//enqueue the buffered data
-	m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
- 
-	m_proxy_port->transmitLL();
+		//enqueue the buffered data
+		m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
+
+		m_proxy_port->transmitLL();
+	}
 }
 
 void SlimSerial::ackProxy(){
@@ -1905,7 +1925,7 @@ void SlimSerial::ackProxy(){
  
 
 
-void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate){
+void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate,uint8_t enable_9bits_proxy,uint8_t proxy_9bit_address){
 	SlimSerial *proxy_port_=NULL;
 	switch(proxy_port_index){
 			#if ENABLE_SLIMSERIAL_USART1
@@ -1978,6 +1998,17 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		if(proxy_port_baudrate == 0 || proxy_port_baudrate==1000000 || proxy_port_baudrate==115200 || proxy_port_baudrate==921600){
 			m_proxy_port->setBaudrate(proxy_port_baudrate);
 		}
+
+
+		//enable 9 bits mode if the proxy port uses 9 bits mode
+		if(m_proxy_port->m_9bits_mode){
+			m_enable_9bits_proxy = enable_9bits_proxy;
+			if(m_enable_9bits_proxy){
+				m_proxy_9bit_address = proxy_9bit_address;
+				m_proxy_port->config9bitTxAddress(m_proxy_9bit_address);
+			}
+		}
+
 
 
 //		rxNeedRestart=1;

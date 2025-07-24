@@ -188,9 +188,12 @@ public:
 	//proxy
 	SLIMSERIAL_PROXY_MODE getProxyMode();
 	SLIMSERIAL_PROXY_MODE m_proxy_mode;
+
 #if ENABLE_PROXY==1
+	bool m_enable_9bits_proxy=false; //proxy 9 bits mode
+	uint8_t m_proxy_9bit_address=0; //proxy 9 bits mode address
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
-	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate);
+	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate,uint8_t enable_node_address,uint8_t node_address);
 	void disableProxy();
 	void ackProxy();
 	void setBaudrate(uint32_t baudrate=0);
@@ -198,6 +201,7 @@ public:
 	SlimSerial *m_proxy_port;
 
 	uint32_t m_last_baudrate;  
+	static uint16_t m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
 #endif
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;
@@ -328,6 +332,7 @@ private:
 
 	SD_USART_StatusTypeDef transmitLL();
 
+	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
