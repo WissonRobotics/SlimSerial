@@ -105,9 +105,7 @@ public:
 			uint16_t 		*tx_queue_buf,
 			uint16_t 		tx_queue_buf_single_size,
 			uint16_t		 tx_queue_meta_size,
-			uint16_t   *rx_pingpong_buf,
-			uint16_t   rx_pingpong_buf_half_size,
-			uint8_t   *rx_circular_buf,
+			uint16_t   *rx_circular_buf,
 			uint16_t  rx_circular_buf_size,
 			uint8_t  *rx_frame,
 			uint16_t rx_frame_size,
@@ -251,10 +249,6 @@ private:
 	static_queue<SD_BUF_INFO, 3> m_tx_queue_meta;
 	SD_BUF_INFO m_tx_last;
 
-	//Rx ping pong buffer
-	uint16_t  *m_rx_pingpong_buf;
-	uint16_t  m_rx_pingpong_buf_half_size;
-	uint16_t m_rx_pingpong_receiving_ind;
 
 	//rx circular buffer
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
