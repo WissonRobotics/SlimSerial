@@ -5,12 +5,12 @@
 
 /****************************** User define Zone Begin***********************/
 
-#define VALVE_SERIAL     slimSerial1
-#define PRINTF_SERIAL    slimSerial5 //use printf
-#define SENSOR_SERIAL    slimSerial3
-#define PC_SERIAL        slimSerial6 // PC UI,  PC Command
-#define MOTOR_SERIAL     slimSerial4 //
-#define FLOWFORCE_SERIAL slimSerial2 //flowsensor and force/torque sensor
+#define VALVE_SERIAL     	slimSerial1
+#define PRINTF_SERIAL    	slimSerial5 //use printf
+#define SENSOR_SERIAL    	slimSerial3
+#define PC_SERIAL        	slimSerial6 // PC UI,  PC Command
+#define MOTOR_SERIAL     	slimSerial4 //
+#define ENDEFFECTOR_SERIAL  slimSerial2 //flowsensor and force/torque sensor
 
 /****************************** SlimSerial Configuration Zone Begin***********************/
 //define which usart to use this driver
@@ -62,7 +62,7 @@
 #if ENABLE_SLIMSERIAL_USART2 == 1
 #define USART2_TX_FRAME_MAX_SIZE   128                         //to be 2^n,  Max bytes of Tx frame
 #define USART2_RX_FRAME_MAX_SIZE   128                         //to be 2^n,  Max bytes of Rx frame
-#define USART2_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM     //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
+#define USART2_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1     //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART2_485_Tx_EN_GPIO_Port RS485_EN2_GPIO_Port         //set to NULL if not used
 #define USART2_485_Tx_EN_GPIO_Pin  RS485_EN2_Pin               //set to NULL if not used
 #define USART2_TX_MODE             SLIMSERIAL_TX_MODE_DMA      // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
@@ -78,7 +78,7 @@
 #define USART3_485_Tx_EN_GPIO_Pin  RS485_EN3_Pin                       //set to NULL if not used
 #define USART3_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART3_RX_MODE             SLIMSERIAL_RX_MODE_TASK                       // 0: disable rx ;  1:enable rx;
-#define USART3_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART3_9_BITS_MODE         1                       // 0: 8 bits mode; 1: 9 bits mode
 #endif
 
 #if ENABLE_SLIMSERIAL_USART4 == 1
@@ -141,27 +141,28 @@
 #if ENABLE_SLIMSERIAL_MICRO_SECONDS
 #define HAL_TICK_TIM TIM6 //The timer used for HAL_Tick()
 #endif
- 
+
 
 //advanced config for F0
 #if defined(__STM32F0xx_HAL_H)
-#define ENABLE_PROXY                         0      //0:disable proxy mode 1:enable proxy mode
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       256    // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     2
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    2
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    2
-
+#define ENABLE_PROXY                         0      //0:disable proxy mode 1:enable proxy mode
+#define SLIMSERIAL_PROXY_BUFFER_SIZE				 	 1200   //proxy buffer size, should be larger than 1029 to hold a YModem frame. wont be used if ENABLE_PROXY is 0
 //advanced config for F4
 #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
-#define ENABLE_PROXY                         1    //0:disable proxy mode 1:enable proxy mode
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     3      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       1024 // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 5    //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
+#define ENABLE_PROXY                         1    //0:disable proxy mode 1:enable proxy mode
+#define SLIMSERIAL_PROXY_BUFFER_SIZE				 	 1200 //proxy buffer size, should be larger than 1029 to hold a YModem frame. wont be used if ENABLE_PROXY is 0
 #endif
 
 
