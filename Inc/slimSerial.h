@@ -4,6 +4,8 @@
 #include <main.h>
 #include "stdio.h"
 #include "usart.h"
+#include "tim.h"
+#include "math.h"
 #include "cmsis_os.h"
 #include <functional>
 #include <slimCircularBuffer.hpp>
@@ -97,6 +99,8 @@ typedef enum
 #endif
 
 
+constexpr TIM_HandleTypeDef* getTimerHandle(uint8_t timer_index);
+
 class SlimSerial{
 
 public:
@@ -114,7 +118,8 @@ public:
 			uint16_t tx_485_En_Pin,
 			uint8_t tx_method,
 			uint8_t rx_method,
-			uint8_t nine_bits_mode);
+			uint8_t nine_bits_mode,
+			uint8_t timeout_timer_index);
 
 	/* Configuration functions */
 	void addRxFrameCallback(std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)> &frameCallbackFunc);
@@ -136,9 +141,9 @@ public:
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
 
-	SD_BUF_INFO &transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload=NULL,uint16_t payloadBytes=0,uint16_t timeout=20);
+	SD_BUF_INFO &transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload=NULL,uint16_t payloadBytes=0,float timeout=20);
 
-	SD_BUF_INFO &transmitReceiveData(uint8_t *pdata,uint16_t dataBytes,uint16_t timeout,bool frameTypeFilterOn=true);
+	SD_BUF_INFO &transmitReceiveData(uint8_t *pdata,uint16_t dataBytes,float timeout,bool frameTypeFilterOn=true);
 
 	SD_BUF_INFO &modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS=20);
 
@@ -168,6 +173,10 @@ public:
 	//usart
 	UART_HandleTypeDef *m_huart;
 
+	//timeout timer
+	TIM_HandleTypeDef *m_timeout_htim;
+	uint8_t m_timeout_htim_index; //index of the timeout timer, used to get the timer handle
+
 	//rx time record
 	uint32_t m_rx_time_start;
 	uint32_t m_rx_time_end;
@@ -189,6 +198,7 @@ public:
 	void start_Rx_DMA_Idle();
 	void txCpltCallback();
 	void rxCpltCallback(uint16_t data_len);
+	void txrxTimeoutCallback();
 	void restartRxFromISR();
 
 	//proxy
@@ -224,7 +234,13 @@ private:
 
 	void frameParser();
 
+	void configTimeoutTimer();
+	void setTimeout(float timeout_ms);
+
 	bool getACK(){return  receivedACK;};
+
+
+	void configRxDMACircularMode();
 
 	SD_USART_StatusTypeDef config9bitMode();
 
@@ -250,17 +266,7 @@ private:
 	void (*m_frameCallbackFuncArray_C[SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN])(SlimSerial *,uint8_t *,uint16_t );
 	void callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes);
 
-#if ENABLE_SLIMSERIAL_MICRO_SECONDS
-	static uint32_t currentTime_us()
-	{
-		return (HAL_GetTick()*1000)+HAL_TICK_TIM->CNT;
-	}
-#else
-	static uint32_t currentTime_us()
-	{
-		return (HAL_GetTick()*1000);
-	}
-#endif
+	static uint32_t currentTime_us();
 
 	//
 	uint8_t headerFilter[SLIMSERIAL_HEADER_FILTER_MAX_LEN][2];
@@ -354,11 +360,14 @@ private:
 	uint32_t rxTaskBuffer[ SLIMSERIAL_RX_TASK_BUFFER_SIZE ];
 	osStaticThreadDef_t rxTaskControlBlock;
 
+
+
 };
 
 
 //global function to get SlimSerial instance by UART_HandleTypeDef
-extern SlimSerial *getSlimSerial(UART_HandleTypeDef *huart=NULL);
+extern SlimSerial *getSlimSerial(UART_HandleTypeDef *huart);
+extern SlimSerial *getSlimSerial(TIM_HandleTypeDef *htim);
 
 
 //global SlimSerial instances
