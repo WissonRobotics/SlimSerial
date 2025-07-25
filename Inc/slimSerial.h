@@ -11,7 +11,7 @@
 #include "slimSerialDefines.h"
 #include "slimSerial_Configs.h"
 
-#define INTERNAL_MAX_FRAME_SIZE 1024
+#define INTERNAL_MAX_FRAME_SIZE 2048
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL 128
 
 typedef struct SLIMSERIAL_FRAME_TYPE_0_TAG {
@@ -116,10 +116,22 @@ public:
 			uint8_t rx_method,
 			uint8_t nine_bits_mode);
 
-	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
+	/* Configuration functions */
+	void addRxFrameCallback(std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)> &frameCallbackFunc);
 
-	SD_USART_StatusTypeDef transmitDataLL(uint8_t *pdata,uint16_t dataBytes);
+	void addRxFrameCallback(void (*frameCallbackFunc)(SlimSerial *,uint8_t *,uint16_t ));
 
+	SD_USART_StatusTypeDef config9bitRxAddress(uint8_t address);
+
+	void config9bitTxAddress(uint8_t address);
+
+    void addHeaderFilter(uint8_t h1,uint8_t h2);
+
+    void addAddressFilter(uint8_t address);
+
+    void addFuncodeFilter(uint8_t funcode);
+
+    /* Transmission functions */
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
@@ -130,13 +142,11 @@ public:
 
 	SD_BUF_INFO &modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS=20);
 
-	void addRxFrameCallback(std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)> &frameCallbackFunc);
-	void addRxFrameCallback(void (*frameCallbackFunc)(SlimSerial *,uint8_t *,uint16_t ));
+	uint32_t readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout);
+
 
 	SD_BUF_INFO &getRxFrame();
 	void clearRxFrame();
-
-	uint32_t readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout);
 
 	SD_USART_StatusTypeDef &getRxStatus();
 
@@ -144,24 +154,16 @@ public:
 	uint8_t getRxFrameType();
 
 
-    void addHeaderFilter(uint8_t h1,uint8_t h2);
-    void addAddressFilter(uint8_t address);
-    void addFuncodeFilter(uint8_t funcode);
+	void toggleHeaderFilter(bool filterOn);
+    void toggleAddressFilter(bool filterOn);
+	void toggleFuncodeFilter(bool filterOn);
 
-	void toggleHeaderFilter(bool filterOn=true);
-    void toggleAddressFilter(bool filterOn=false);
-	void toggleFuncodeFilter(bool filterOn=false);
-
-    void toggle485Tx(bool txOn=true);
+    void toggle485Tx(bool txOn);
 
 	uint32_t getRxIdleTimeUs();
 	uint32_t getRxFrameIdleTimeUs();
 
-	SD_USART_StatusTypeDef config9bitMode();
-	SD_USART_StatusTypeDef config9bitRxAddress(uint8_t address);
-	void config9bitTxAddress(uint8_t address);
 
-	int8_t debugOutputEnable;
 
 	//usart
 	UART_HandleTypeDef *m_huart;
@@ -171,63 +173,94 @@ public:
 	uint32_t m_rx_time_end;
 	uint32_t m_rx_time_cost;
 	uint32_t m_rx_time_validFrame;
+	uint32_t m_rx_time_validFrame_cost;
+	uint32_t m_rx_time_callback_enter;
+	uint32_t m_rx_time_callback_cost;
 
 	//tx time record
 	uint32_t m_tx_time_start;
 	uint32_t m_tx_time_end;
 	uint32_t m_tx_time_cost;
 
+	//txrx time record
+	uint32_t m_txrx_time_cost;
+	uint32_t m_tx_once;
+
 	void start_Rx_DMA_Idle();
 	void txCpltCallback();
 	void rxCpltCallback(uint16_t data_len);
-
-	uint8_t rxNeedRestart;
-
 	void restartRxFromISR();
 
 	//proxy
 	SLIMSERIAL_PROXY_MODE getProxyMode();
 	SLIMSERIAL_PROXY_MODE m_proxy_mode;
 
+	//debug output
+	int8_t debugOutputEnable;
+
 #if ENABLE_PROXY==1
-	bool m_enable_9bits_proxy=false; //proxy 9 bits mode
-	uint8_t m_proxy_9bit_address=0; //proxy 9 bits mode address
-	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate,uint8_t enable_node_address,uint8_t node_address);
 	void disableProxy();
 	void ackProxy();
+	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void setBaudrate(uint32_t baudrate=0);
-
+	bool m_enable_9bits_proxy=false; //proxy 9 bits mode
+	uint8_t m_proxy_9bit_address=0; //proxy 9 bits mode address
 	SlimSerial *m_proxy_port;
-
 	uint32_t m_last_baudrate;  
 	static uint16_t m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
 #endif
-	uint32_t m_txrx_time_cost;
-	uint32_t m_tx_once;
 
 private:
+	HAL_StatusTypeDef createRxTasks();
+
+	void rxHandlerThread();
+
+	static void rxTaskFuncImpl(const void* parm){
+		 ((SlimSerial *)(parm))->rxHandlerThread();
+	}
+
+	HAL_StatusTypeDef Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
 
 	void frameParser();
 
-	bool getACK(){
-		return  receivedACK;
-	};
+	bool getACK(){return  receivedACK;};
 
+	SD_USART_StatusTypeDef config9bitMode();
 
+	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
+	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
+
+	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
+
+	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
+	SD_BUF_INFO queueTxData(uint8_t *pdata,uint16_t dataBytes);
+
+	SD_USART_StatusTypeDef transmitLL();
+
+	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
+
+	SD_USART_StatusTypeDef transmitDataLL(uint8_t *pdata,uint16_t dataBytes);
 
     bool applyHeaderFilter(uint8_t h1In,uint8_t h2In);
     bool applyAddressFilter(uint8_t addressIn);
     bool applyFuncodeFilter(uint8_t funcode);
 
-	void callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes){
-		for(int i=0;i<m_frameCallbackFuncNumber;i++){
-			m_frameCallbackFuncArray[i](slimSerialDev,pdata,databytes);
-		}
-		for(int i=0;i<m_frameCallbackFuncNumber_C;i++){
-			m_frameCallbackFuncArray_C[i](slimSerialDev,pdata,databytes);
-		}
-	};
+	std::array<std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)>, SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN> m_frameCallbackFuncArray;
+	void (*m_frameCallbackFuncArray_C[SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN])(SlimSerial *,uint8_t *,uint16_t );
+	void callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes);
+
+#if ENABLE_SLIMSERIAL_MICRO_SECONDS
+	static uint32_t currentTime_us()
+	{
+		return (HAL_GetTick()*1000)+HAL_TICK_TIM->CNT;
+	}
+#else
+	static uint32_t currentTime_us()
+	{
+		return (HAL_GetTick()*1000);
+	}
+#endif
 
 	//
 	uint8_t headerFilter[SLIMSERIAL_HEADER_FILTER_MAX_LEN][2];
@@ -244,7 +277,6 @@ private:
 
 	bool lengthFilterOn;
 
-
 	//Tx queue buffer
 	uint16_t  *m_tx_queue_buf;
 	uint16_t  m_tx_queue_buf_single_size;
@@ -252,7 +284,6 @@ private:
 	uint16_t  m_tx_buf_ind;
 	static_queue<SD_BUF_INFO, 3> m_tx_queue_meta;
 	SD_BUF_INFO m_tx_last;
-
 
 	//rx circular buffer
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
@@ -274,11 +305,19 @@ private:
 	uint8_t m_9bits_mode_error;
 	bool m_enable_rx_wake_up;
 
-	//
+	//tx rx statistics
 	int m_totalTxFrames = 0;
 	int m_totalRxFrames = 0;
 	int m_totalTxBytes = 0;
 	int m_totalRxBytes = 0;
+
+	//parsing
+	int32_t m_parse_remainingBytes;
+
+	//callback function members
+	uint8_t m_frameCallbackFuncNumber;
+	uint8_t m_frameCallbackFuncNumber_C;
+	uint8_t m_frameCallbackFuncNumber_all;
 
     //rx ack
 	bool receivedACK;
@@ -293,89 +332,36 @@ private:
     //tx method.
     uint8_t m_tx_mode;//0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
 
+	uint8_t rxNeedRestart;
 
-	//frame type
-	/*
-	0:  Any Rx format
-	1:  Header1 Header2 Src Len Func  + payloads + crc16
-	2:  Header1 Header2 Len  + payloads + crc16
-	3:  MODBUS frame
-	*/
+	//rx frame type
 	uint8_t m_rx_frame_type;
 	uint8_t m_rx_frame_type_ori;
 
 	//synchronization tools
 	bool writeLocked = false;
-//	SemaphoreHandle_t writeMtx;
-//	StaticSemaphore_t writeMtxBuffer;
-//	SemaphoreHandle_t readMtx;
-//	StaticSemaphore_t readMtxBuffer;
 
-//    std::mutex txrxMtx;
-//    std::mutex ackMtx;
-//    std::mutex decodeMtx;
-//	std::condition_variable ackCV;
-//    std::condition_variable txrxCV;
     bool txrxLocked = false;
 
-
-
-	std::array<std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)>, SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN> m_frameCallbackFuncArray;
-	uint8_t m_frameCallbackFuncNumber;
-
-	void (*m_frameCallbackFuncArray_C[SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN])(SlimSerial *,uint8_t *,uint16_t );
-	uint8_t m_frameCallbackFuncNumber_C;
-
-	uint8_t m_frameCallbackFuncNumber_all;
-
-	HAL_StatusTypeDef createRxTasks();
-
-	SD_USART_StatusTypeDef transmitLL();
-
-
-	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
-	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
-	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
-
-	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
-	SD_BUF_INFO queueTxData(uint8_t *pdata,uint16_t dataBytes);
-  
-	//txrx task
+	//txrx task ID
 	uint32_t *txrxThreadID;
 
-	//rx handling task
+	//rx handling task ID
 	uint32_t *rxThreadID;
 	osThreadId rxTaskHandle;
 
-	int32_t m_parse_remainingBytes;
-
-	HAL_StatusTypeDef Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size);
-
-
+	//rx task buffer
 	uint32_t rxTaskBuffer[ SLIMSERIAL_RX_TASK_BUFFER_SIZE ];
 	osStaticThreadDef_t rxTaskControlBlock;
-	static void rxTaskFuncImpl(const void* parm){
-		 ((SlimSerial *)(parm))->rxHandlerThread();
-	}
 
-	void rxHandlerThread();
-
-#if ENABLE_SLIMSERIAL_MICRO_SECONDS
-	static uint32_t currentTime_us()
-	{
-		return (HAL_GetTick()*1000)+HAL_TICK_TIM->CNT;
-	}
-#else
-	static uint32_t currentTime_us()
-	{
-		return (HAL_GetTick()*1000);
-	}
-#endif
 };
 
+
+//global function to get SlimSerial instance by UART_HandleTypeDef
 extern SlimSerial *getSlimSerial(UART_HandleTypeDef *huart=NULL);
 
 
+//global SlimSerial instances
 #if ENABLE_SLIMSERIAL_USART1
 extern SlimSerial slimSerial1;
 #endif

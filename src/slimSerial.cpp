@@ -385,8 +385,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 			uint8_t tx_method,
 			uint8_t rx_method,
 			uint8_t bits_9_mode)
-:m_rx_circular_buf((uint8_t *)rx_circular_buf,rx_circular_buf_size,bits_9_mode),
- m_frameCallbackFuncArray{}{
+:m_frameCallbackFuncArray{},
+ m_rx_circular_buf((uint8_t *)rx_circular_buf,rx_circular_buf_size,bits_9_mode)
+ {
 
 	m_huart = uartHandle;
 
@@ -814,7 +815,8 @@ uint8_t SlimSerial::getRxFrameType(){
 	return m_rx_frame_type;
 }
 
-//this function will be executed in an async thread
+
+
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
 
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
@@ -1290,6 +1292,17 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 
 }
 
+void SlimSerial::callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes){
+	m_rx_time_callback_enter = currentTime_us();
+	for(int i=0;i<m_frameCallbackFuncNumber;i++){
+		m_frameCallbackFuncArray[i](slimSerialDev,pdata,databytes);
+	}
+	for(int i=0;i<m_frameCallbackFuncNumber_C;i++){
+		m_frameCallbackFuncArray_C[i](slimSerialDev,pdata,databytes);
+	}
+	m_rx_time_callback_cost = currentTime_us() - m_rx_time_callback_enter;
+};
+
 
 //frame parser shouldn't care about the 9 bits mode, since it is already handled in lower transmission layer
 void SlimSerial::frameParser(){
@@ -1321,6 +1334,7 @@ void SlimSerial::frameParser(){
 
 			m_totalRxFrames++;
 			m_rx_time_validFrame = currentTime_us();
+			m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
 
 			callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1395,6 +1409,7 @@ void SlimSerial::frameParser(){
 										m_totalRxFrames++;
 
 										m_rx_time_validFrame = currentTime_us();
+										m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
 #if ENABLE_PROXY==1
 										if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
 											//enable proxy
@@ -1555,6 +1570,7 @@ void SlimSerial::frameParser(){
 
 							m_totalRxFrames++;
 							m_rx_time_validFrame = currentTime_us();
+							m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
 
 							callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1655,6 +1671,7 @@ void SlimSerial::frameParser(){
 
 								m_totalRxFrames++;
 								m_rx_time_validFrame = currentTime_us();
+								m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
@@ -1770,6 +1787,7 @@ void SlimSerial::frameParser(){
 
 								m_totalRxFrames++;
 								m_rx_time_validFrame = currentTime_us();
+								m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
