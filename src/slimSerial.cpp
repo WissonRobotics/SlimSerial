@@ -963,34 +963,38 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 	}
 }
 
+SD_BUF_INFO SlimSerial::bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address) {
+	SD_BUF_INFO sd_buf_info;
+
+	uint16_t *pBuf_U16 = (uint16_t *)pDes;
+
+	//add the address byte with the 9's bit set
+	*pBuf_U16++ =  (uint16_t)(prefix_address | 0x100); //set the 9th bit
+
+	//copy data from U8 to U16 buffer
+	for(int i=0;i<datalen;i++){
+		*pBuf_U16++ = *pSrc++;
+	}
+
+	sd_buf_info.pdata = (uint8_t *)pDes;
+	sd_buf_info.dataBytes= datalen;   //for 9-bit mode, the address byte is not included in the tx dataBytes
+
+
+	return sd_buf_info;
+}
+
+
 SD_BUF_INFO SlimSerial::bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen) {
 	SD_BUF_INFO sd_buf_info;
-	if(m_9bits_mode){
-		uint16_t *pBuf_U16 = (uint16_t *)pDes;
 
-		//add the address byte with the 9's bit set
-		*pBuf_U16++ =  (uint16_t)(m_9bits_mode_address_tx | 0x100); //set the 9th bit
+	uint8_t *pBuf_U8 =(uint8_t *)pDes;
 
-		//copy data from U8 to U16 buffer
-		for(int i=0;i<datalen;i++){
-			*pBuf_U16++ = *pSrc++;
-		}
+	//directly copy data from U8 to U8 buffer
+	memcpy(pBuf_U8, pSrc, datalen);
 
-		sd_buf_info.pdata = pDes;
-		sd_buf_info.dataBytes= datalen;   //for 9-bit mode, the address byte is not included in the tx dataBytes
+	sd_buf_info.pdata = pDes;
+	sd_buf_info.dataBytes= datalen;
 
-	}
-	else{
-		uint8_t *pBuf_U8 =(uint8_t *)pDes;
-
-		//directly copy data from U8 to U8 buffer
-		memcpy(pBuf_U8, pSrc, datalen);
-
-		sd_buf_info.pdata = pDes;
-		sd_buf_info.dataBytes= datalen;
-
-	}
- 
 	return sd_buf_info;
 }
 
@@ -1008,11 +1012,11 @@ SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
 
 	if(m_9bits_mode){
 		uint16_t *pBuf_U16 = ((uint16_t *)m_tx_queue_buf) + ind;
-		return bufferDataTo((uint8_t *)pBuf_U16, pdata, datalen);
+		return bufferDataToU16withAddress(pBuf_U16, pdata, datalen,m_9bits_mode_address_tx);
 	}
 	else{
 		uint8_t *pBuf_U8 =((uint8_t *)m_tx_queue_buf) + ind;
-		return bufferDataTo((uint8_t *)pBuf_U8, pdata, datalen);
+		return bufferDataTo(pBuf_U8, pdata, datalen);
 
 	}
 }
@@ -1910,7 +1914,15 @@ void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 		m_proxy_port->transmitDataLL(pData,databytes);
 	}
 	else{//otherwise, we may need to use a static larger buffer to support large frame size of YModem
-		SD_BUF_INFO sd_buf_info = bufferDataTo((uint8_t *)m_proxy_buffer, pData, databytes);
+		SD_BUF_INFO sd_buf_info;
+		if(m_proxy_port->m_9bits_mode){
+			sd_buf_info = bufferDataToU16withAddress((uint16_t *)m_proxy_buffer, pData, databytes,m_proxy_9bit_address);
+		}
+		else{
+			sd_buf_info = bufferDataTo((uint8_t *)m_proxy_buffer, pData, databytes);
+
+		}
+
 
 		//enqueue the buffered data
 		m_proxy_port->m_tx_queue_meta.push(sd_buf_info);

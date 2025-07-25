@@ -332,6 +332,8 @@ private:
 
 	SD_USART_StatusTypeDef transmitLL();
 
+
+	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
 	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
