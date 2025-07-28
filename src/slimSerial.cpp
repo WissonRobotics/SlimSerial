@@ -384,10 +384,6 @@ SlimSerial slimSerial8(&huart8,
 uint16_t SlimSerial::m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]={}; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
 #endif
 
-#define SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT 0x80
-
-
-
 
 
 SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
@@ -563,6 +559,7 @@ inline SlimSerial *getSlimSerial(TIM_HandleTypeDef *htim){
 	return NULL;
 }
 
+#if ANY_TIMEOUT_TIMER_USED
 void SlimSerial::configTimeoutTimer(){
 	//if timeout timer is not set, use TIM6
 	if(m_timeout_htim_index==0){
@@ -624,6 +621,28 @@ void SlimSerial::configTimeoutTimer(){
 
 }
 
+void SlimSerial::setTimeout(float timeout_ms){
+
+	if(m_timeout_htim!=NULL){
+
+		HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer in case  it is running
+
+		__HAL_TIM_SET_COUNTER(m_timeout_htim,0); //reset the timer counter
+
+		__HAL_TIM_SET_AUTORELOAD(m_timeout_htim, std::lround(timeout_ms*1000)); //convert ms to us
+
+		HAL_TIM_Base_Start_IT(m_timeout_htim); //start the timer to measure tx rx timeout
+	}
+}
+
+void SlimSerial::stopTimeout(){
+
+	if(m_timeout_htim!=NULL){
+		HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer in case  it is running
+	}
+}
+
+#endif //ANY_TIMEOUT_TIMER_USED
 
 SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  	//check 9bit mode bit is set
@@ -1255,26 +1274,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *p
 
 
 
-void SlimSerial::setTimeout(float timeout_ms){
 
-	if(m_timeout_htim!=NULL){
-
-		HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer in case  it is running
-
-		__HAL_TIM_SET_COUNTER(m_timeout_htim,0); //reset the timer counter
-
-		__HAL_TIM_SET_AUTORELOAD(m_timeout_htim, std::lround(timeout_ms*1000)); //convert ms to us
-
-		HAL_TIM_Base_Start_IT(m_timeout_htim); //start the timer to measure tx rx timeout
-	}
-}
-
-void SlimSerial::stopTimeout(){
-
-	if(m_timeout_htim!=NULL){
-		HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer in case  it is running
-	}
-}
 
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
@@ -1300,9 +1300,10 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 		xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));//ulTaskNotifyValueClear((TaskHandle_t)(txrxThreadID),0xffffffff);
 	}
 
-	//setup accurate timeout timer if it is configured
+	//setup accurate timeout timer ifconfigured
+#if ANY_TIMEOUT_TIMER_USED
 	setTimeout(timeout_ms);
-
+#endif
 	//start a tx frame
 	transmitData(pData, dataBytes);
 
@@ -1312,8 +1313,8 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 		uint32_t timeoutMS = (temp==1) ? temp+1: temp; //1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
 		uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,timeoutMS);//we are waiting for the setTimer timeout to notify a value SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT.
 
-		//timout
-		if((ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0 || ulTaskNotifyRet==0){
+		//timout from ulTask timeout or  from the timer
+		if(ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0){
 			m_rx_last.dataBytes=0;
 			m_txrx_time_cost = currentTime_us()-m_tx_time_start;
 			if (m_rx_status==SD_USART_BUSY){
@@ -1330,7 +1331,9 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 	}
 
+#if ANY_TIMEOUT_TIMER_USED
 	stopTimeout(); //stop the timer
+#endif
 
 	//restore frame type
 	m_rx_frame_type = rxFrameType_temp;
@@ -1356,8 +1359,10 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));//ulTaskNotifyValueClear((TaskHandle_t)(txrxThreadID),0xffffffff);
 	}
 
-	//setup accurate timeout timer if it is configured
+	//setup accurate timeout timer ifconfigured
+#if ANY_TIMEOUT_TIMER_USED
 	setTimeout(timeout_ms);
+#endif
 
 	//start a tx frame
 	transmitFrame(address, fcode,payload,payloadBytes);
@@ -1368,7 +1373,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		uint32_t timeoutMS = (temp==1) ? temp+1: temp; //1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
 		uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,timeoutMS);
 		//timout
-		if((ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0 || ulTaskNotifyRet==0){
+		if(ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0){
 			m_rx_last.dataBytes=0;
 			m_txrx_time_cost = currentTime_us()-m_tx_time_start;
 			if (m_rx_status==SD_USART_BUSY){
@@ -1384,7 +1389,9 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		HAL_Delay(10);
 	}
 
+#if ANY_TIMEOUT_TIMER_USED
 	stopTimeout(); //stop the timer
+#endif
 
 	return m_rx_last;
 
@@ -2093,7 +2100,9 @@ void SlimSerial::rxHandlerThread() {
 
 	config9bitMode();
 
+#if ANY_TIMEOUT_TIMER_USED
 	configTimeoutTimer();
+#endif
 
 	osDelay(20);
 
@@ -2330,6 +2339,15 @@ void SlimSerial::setBaudrate(uint32_t baudrate){
 }
 #endif
 
+#define ANY_TIMEOUT_TIMER_USED (USART1_TIMEOUT_TIMER_INDEX && \
+		USART1_TIMEOUT_TIMER_INDEX && \
+		USART2_TIMEOUT_TIMER_INDEX && \
+		USART3_TIMEOUT_TIMER_INDEX && \
+		USART4_TIMEOUT_TIMER_INDEX && \
+		USART5_TIMEOUT_TIMER_INDEX && \
+		USART6_TIMEOUT_TIMER_INDEX && \
+		USART7_TIMEOUT_TIMER_INDEX && \
+		USART8_TIMEOUT_TIMER_INDEX)
 
 #define ANY_TIMEOUT_TIMER_INDEX_EQUAL(index) \
 	(SLIMSERIAL_HAL_TICK_TIMER_INDEX == index || \

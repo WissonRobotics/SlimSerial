@@ -98,6 +98,18 @@ typedef enum
     };
 #endif
 
+#define ANY_TIMEOUT_TIMER_USED (USART1_TIMEOUT_TIMER_INDEX && \
+		USART1_TIMEOUT_TIMER_INDEX && \
+		USART2_TIMEOUT_TIMER_INDEX && \
+		USART3_TIMEOUT_TIMER_INDEX && \
+		USART4_TIMEOUT_TIMER_INDEX && \
+		USART5_TIMEOUT_TIMER_INDEX && \
+		USART6_TIMEOUT_TIMER_INDEX && \
+		USART7_TIMEOUT_TIMER_INDEX && \
+		USART8_TIMEOUT_TIMER_INDEX)
+
+
+#define SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT 0x80
 
 constexpr TIM_HandleTypeDef* getTimerHandle(uint8_t timer_index);
 
@@ -234,10 +246,6 @@ private:
 
 	void frameParser();
 
-	void configTimeoutTimer();
-	void setTimeout(float timeout_ms);
-	void stopTimeout();
-
 	bool getACK(){return  receivedACK;};
 
 
@@ -268,6 +276,12 @@ private:
 	void callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes);
 
 	static uint32_t currentTime_us();
+
+#if ANY_TIMEOUT_TIMER_USED
+	void configTimeoutTimer();
+	void setTimeout(float timeout_ms);
+	void stopTimeout();
+#endif
 
 	//
 	uint8_t headerFilter[SLIMSERIAL_HEADER_FILTER_MAX_LEN][2];
