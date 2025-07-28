@@ -195,7 +195,7 @@ public:
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;
 
-	void start_Rx_DMA_Idle();
+	void start_Rx_DMA_Idle_Circular();
 	void txCpltCallback();
 	void rxCpltCallback(uint16_t data_len);
 	void txrxTimeoutCallback();
@@ -214,8 +214,8 @@ public:
 	void ackProxy();
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void setBaudrate(uint32_t baudrate=0);
-	bool m_enable_9bits_proxy=false; //proxy 9 bits mode
-	uint8_t m_proxy_9bit_address=0; //proxy 9 bits mode address
+	bool m_enable_9bits_proxy=false; //Indicates the 9 bits mode of the proxy ports. This is differnt from the 9 bits mode of the current port, which is indicated by m_9bits_mode.
+	uint8_t m_proxy_9bit_address=0; //only used when m_enable_9bits_proxy is true, this is the address of the proxy port in 9 bits mode.
 	SlimSerial *m_proxy_port;
 	uint32_t m_last_baudrate;  
 	static uint16_t m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode

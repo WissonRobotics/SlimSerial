@@ -1355,12 +1355,17 @@ HAL_StatusTypeDef SlimSerial::Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *
 	return status;
 }
 
-void SlimSerial::start_Rx_DMA_Idle(){
+void SlimSerial::start_Rx_DMA_Idle_Circular(){
 	toggle485Tx(false);
 	m_rx_circular_buf.clear(); //clear the circular buffer before starting a new receive
 	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.buffer, m_rx_circular_buf.bufferSize) != HAL_OK)
 	{
-		HAL_UART_AbortReceive_IT(m_huart);
+		HAL_UART_AbortReceive(m_huart);
+//		HAL_UART_Abort
+//		if(m_huart->hdmarx->Lock == HAL_LOCKED){
+//			m_huart->hdmarx->Lock = HAL_UNLOCKED;
+//			m_huart->hdmarx->State =  HAL_DMA_STATE_READY;
+//		}
 	}
 
 	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_HT); // we don't need half-transfer interrupt
@@ -1660,12 +1665,13 @@ void SlimSerial::frameParser(){
 			m_rx_last.dataBytes = m_parse_remainingBytes;
 			m_totalRxFrames++;
 
-			//in transparent mode, only check FUNC_DISABLE_PROXY_INTERNAL to disable proxy
+			//In transparent mode, only FUNC_DISABLE_PROXY_INTERNAL is check.
+			//further FUNC_ENABLE_PROXY_INTERNAL will be routed like normal data, enabling chained proxies.
 			if( m_rx_last.dataBytes>=7 &&
 				m_rx_last.pdata[0]==0x5A &&
 				m_rx_last.pdata[1]==0xA5 &&
-				m_rx_last.pdata[2]==0x00 &&
-				m_rx_last.pdata[3]==0x00 &&
+//				m_rx_last.pdata[2]==0x00 &&	//ignore source address
+//				m_rx_last.pdata[3]==0x00 && //ignore data bytes
 				m_rx_last.pdata[4]==((uint8_t)FUNC_DISABLE_PROXY_INTERNAL)
 				){
 				uint16_t crc1 = SD_CRC_Calculate(&(m_rx_last.pdata[0]), 5);
@@ -2040,7 +2046,7 @@ void SlimSerial::rxHandlerThread() {
 
 	configTimeoutTimer();
 
-	start_Rx_DMA_Idle();
+	start_Rx_DMA_Idle_Circular();
 
 	/* Infinite loop */
 	for (;;) {
@@ -2049,7 +2055,7 @@ void SlimSerial::rxHandlerThread() {
 
 		if(rxNeedRestart){
 			rxNeedRestart=0;
-			start_Rx_DMA_Idle();
+			start_Rx_DMA_Idle_Circular();
 			continue;
 		}
 
@@ -2075,9 +2081,12 @@ uint32_t SlimSerial::getRxFrameIdleTimeUs(){
 
 void SlimSerial::restartRxFromISR(){
 	rxNeedRestart=1;
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	if(rxThreadID != NULL) {
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+
 }
 
 SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
@@ -2087,20 +2096,12 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 }
 #if ENABLE_PROXY==1
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
-	//if current port is in 9 bits mode, this is the downstream port, we just transmit the data to the upstream port directly
-	if(m_9bits_mode){
+	//if proxy port is in 8 bit mode, we just transmit the data directly. pData is always 8 bits data in m_rx_last.pdata
+	if(!m_enable_9bits_proxy){
 		m_proxy_port->transmitDataLL(pData,databytes);
 	}
 	else{//otherwise, we may need to use a static larger buffer to support large frame size of YModem
-		SD_BUF_INFO sd_buf_info;
-		if(m_proxy_port->m_9bits_mode){
-			sd_buf_info = bufferDataToU16withAddress((uint16_t *)m_proxy_buffer, pData, databytes,m_proxy_9bit_address);
-		}
-		else{
-			sd_buf_info = bufferDataTo((uint8_t *)m_proxy_buffer, pData, databytes);
-
-		}
-
+		SD_BUF_INFO sd_buf_info = bufferDataToU16withAddress((uint16_t *)m_proxy_buffer, pData, databytes,m_proxy_9bit_address);
 
 		//enqueue the buffered data
 		m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
@@ -2190,21 +2191,16 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		}
 
 
-		//enable 9 bits mode if the proxy port uses 9 bits mode
-		if(m_proxy_port->m_9bits_mode){
-			m_enable_9bits_proxy = enable_9bits_proxy;
-			if(m_enable_9bits_proxy){
-				m_proxy_9bit_address = proxy_9bit_address;
-				m_proxy_port->config9bitTxAddress(m_proxy_9bit_address);
-			}
+		//set the proxy serial port to be 8 bits or 9 bits mode
+		m_enable_9bits_proxy = enable_9bits_proxy;
+		if(m_enable_9bits_proxy){
+			m_proxy_9bit_address = proxy_9bit_address;
+			m_proxy_port->config9bitTxAddress(m_proxy_9bit_address);
 		}
 
+		m_proxy_port->m_enable_9bits_proxy = false;//upstream port is always 8 bits mode
 
 
-//		rxNeedRestart=1;
-//		if (rxThreadID != NULL) {
-//			xTaskNotify((TaskHandle_t)(rxThreadID), 1, eSetValueWithOverwrite);
-//		}
 
 	}
 
@@ -2227,9 +2223,12 @@ void SlimSerial::disableProxy(){
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 		m_proxy_port->m_proxy_port = NULL;
 
+		m_proxy_port->m_enable_9bits_proxy = false;
+
 	}
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;
+	m_enable_9bits_proxy = false;
 }
 
 
@@ -2463,6 +2462,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 	//restart
 	SlimSerial *slimSerialDev=getSlimSerial(huart);
 	if(slimSerialDev){
+
 		//clear rx error flag
 		__HAL_UART_CLEAR_PEFLAG(huart);
 
