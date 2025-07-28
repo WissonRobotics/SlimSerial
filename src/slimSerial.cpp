@@ -1218,6 +1218,13 @@ void SlimSerial::setTimeout(float timeout_ms){
 	}
 }
 
+void SlimSerial::stopTimeout(){
+
+	if(m_timeout_htim!=NULL){
+		HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer in case  it is running
+	}
+}
+
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
 		m_rx_status = SD_USART_ERROR;
@@ -1272,7 +1279,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 	}
 
-	HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer
+	stopTimeout(); //stop the timer
 
 	//restore frame type
 	m_rx_frame_type = rxFrameType_temp;
@@ -1326,7 +1333,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		HAL_Delay(10);
 	}
 
-	HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer
+	stopTimeout(); //stop the timer
 
 	return m_rx_last;
 

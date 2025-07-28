@@ -236,6 +236,7 @@ private:
 
 	void configTimeoutTimer();
 	void setTimeout(float timeout_ms);
+	void stopTimeout();
 
 	bool getACK(){return  receivedACK;};
 
