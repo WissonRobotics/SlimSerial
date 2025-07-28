@@ -679,6 +679,55 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  			}
  		}
  	}
+ 	else{
+ 		if(m_huart->Init.WordLength != UART_WORDLENGTH_8B){
+
+			//otherwise, set to 9bit mode
+			m_huart->Init.WordLength = UART_WORDLENGTH_8B;
+			if (HAL_UART_Init(m_huart) != HAL_OK)
+			{
+				//error handling
+				m_9bits_mode_error = 1;
+				return SD_USART_ERROR;
+			}
+		}
+
+ 		//check tx DMA to be 8bit
+ 		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
+ 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
+ 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
+ 			   ){
+ 				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+ 				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+ 				if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
+ 				{
+ 					//error handling
+ 					m_9bits_mode_error = 1;
+ 					return SD_USART_ERROR;
+ 				}
+ 			}
+ 		}
+
+ 		//check rx DMA to be 8bit
+ 		//if rx is enabled, it must use DMA
+ 		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
+ 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
+ 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
+ 			   ){
+
+ 				//otherwise, set to 8bit mode
+ 				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+ 				m_huart->hdmarx->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+
+ 				if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
+ 				{
+ 					//error handling
+ 					m_9bits_mode_error = 1;
+ 					return SD_USART_ERROR;
+ 				}
+ 			}
+ 		}
+ 	}
  	return SD_USART_OK;
 }
 
@@ -2038,13 +2087,13 @@ void SlimSerial::rxHandlerThread() {
 	 /*get ready for receive*/
 	rxThreadID = (uint32_t *)osThreadGetId();
 
-	osDelay(100);
-
 	configRxDMACircularMode();
 
 	config9bitMode();
 
 	configTimeoutTimer();
+
+	osDelay(20);
 
 	start_Rx_DMA_Idle_Circular();
 
