@@ -10,7 +10,7 @@
 #define SENSOR_SERIAL    	slimSerial3
 #define PC_SERIAL        	slimSerial6 // PC UI,  PC Command
 #define MOTOR_SERIAL     	slimSerial4 //
-#define ENDEFFECTOR_SERIAL  slimSerial2 //flowsensor and force/torque sensor
+#define ENDEFFECTOR_SERIAL slimSerial2 //flowsensor and force/torque sensor
 
 /****************************** SlimSerial Configuration Zone Begin***********************/
 //define which usart to use this driver
@@ -56,7 +56,7 @@
 #define USART1_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART1_RX_MODE             SLIMSERIAL_RX_MODE_TASK // 0: disable rx ;  1:enable rx frame parse in task; 2: enable rx frame parse in interrupt
 #define USART1_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
-
+#define USART1_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART2 == 1
@@ -68,6 +68,7 @@
 #define USART2_TX_MODE             SLIMSERIAL_TX_MODE_DMA      // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART2_RX_MODE             SLIMSERIAL_RX_MODE_TASK                           // 0: disable rx ;  1:enable rx;
 #define USART2_9_BITS_MODE         0                           // 0: 8 bits mode; 1: 9 bits mode
+#define USART2_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART3 == 1
@@ -79,6 +80,7 @@
 #define USART3_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART3_RX_MODE             SLIMSERIAL_RX_MODE_TASK                       // 0: disable rx ;  1:enable rx;
 #define USART3_9_BITS_MODE         1                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART3_TIMEOUT_TIMER_INDEX 14 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART4 == 1
@@ -90,6 +92,7 @@
 #define USART4_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART4_RX_MODE             SLIMSERIAL_RX_MODE_TASK                       // 0: disable rx ;  1:enable rx;
 #define USART4_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART4_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART5 == 1
@@ -101,6 +104,7 @@
 #define USART5_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART5_RX_MODE             SLIMSERIAL_RX_MODE_TASK                       // 0: disable rx ;  1:enable rx;
 #define USART5_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART5_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART6 == 1
@@ -112,6 +116,7 @@
 #define USART6_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART6_RX_MODE             SLIMSERIAL_RX_MODE_TASK                       // 0: disable rx ;  1:enable rx;
 #define USART6_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART6_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART7 == 1
@@ -123,6 +128,7 @@
 #define USART7_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART7_RX_MODE             SLIMSERIAL_RX_MODE_TASK                      // 0: disable rx ;  1:enable rx;
 #define USART7_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART7_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART8 == 1
@@ -134,17 +140,15 @@
 #define USART8_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART8_RX_MODE             SLIMSERIAL_RX_MODE_TASK                      // 0: disable rx ;  1:enable rx;
 #define USART8_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART8_TIMEOUT_TIMER_INDEX 0	 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
-//enable recording the tx time cost with micro seconds.
-#define ENABLE_SLIMSERIAL_MICRO_SECONDS 1
-#if ENABLE_SLIMSERIAL_MICRO_SECONDS
-#define HAL_TICK_TIM TIM6 //The timer used for HAL_Tick()
-#endif
+
 
 
 //advanced config for F0
 #if defined(__STM32F0xx_HAL_H)
+#define SLIMSERIAL_HAL_TICK_TIMER_INDEX 	 6	//htim6 is used for HAL_Tick()
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       256    // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
@@ -155,9 +159,10 @@
 #define SLIMSERIAL_PROXY_BUFFER_SIZE				 	 1200   //proxy buffer size, should be larger than 1029 to hold a YModem frame. wont be used if ENABLE_PROXY is 0
 //advanced config for F4
 #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+#define SLIMSERIAL_HAL_TICK_TIMER_INDEX		 6		//htim6 is used for HAL_Tick()
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     3      //default tx queue size
-#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       1024 // rx task stack size
-#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 5    //number of callbacks that can attach to one serial
+#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       1024   // rx task stack size
+#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 5      //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
