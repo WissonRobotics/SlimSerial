@@ -596,6 +596,7 @@ void SlimSerial::configTimeoutTimer(){
 		}
 	}
 	else{//APB2 for TIM1, TIM8, TIM9, TIM10, TIM11
+#if defined(__STM32F4xx_HAL_H)
 		if (clkconfig.APB2CLKDivider == RCC_HCLK_DIV1)
 		{
 			uwTimclock = HAL_RCC_GetPCLK2Freq();
@@ -604,6 +605,7 @@ void SlimSerial::configTimeoutTimer(){
 		{
 			uwTimclock = 2UL * HAL_RCC_GetPCLK2Freq();
 		}
+#endif
 	}
 
 	m_timeout_htim->Init.Prescaler = (uint32_t) ((uwTimclock / 1000000U) - 1U);
