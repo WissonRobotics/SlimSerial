@@ -561,6 +561,7 @@ inline SlimSerial *getSlimSerial(TIM_HandleTypeDef *htim){
 
 #if ANY_TIMEOUT_TIMER_USED
 void SlimSerial::configTimeoutTimer(){
+
 	//if timeout timer is not set, use TIM6
 	if(m_timeout_htim_index==0){
 		return;
@@ -616,9 +617,9 @@ void SlimSerial::configTimeoutTimer(){
 	  Error_Handler();
 	}
 
-
+#if USE_HAL_TIM_REGISTER_CALLBACKS==1
 	HAL_TIM_RegisterCallback(m_timeout_htim, HAL_TIM_PERIOD_ELAPSED_CB_ID, [](TIM_HandleTypeDef *htim){getSlimSerial(htim)->txrxTimeoutCallback();});
-
+#endif
 }
 
 void SlimSerial::setTimeout(float timeout_ms){
@@ -643,6 +644,20 @@ void SlimSerial::stopTimeout(){
 }
 
 #endif //ANY_TIMEOUT_TIMER_USED
+
+void SlimSerial::configRxDMACircularMode() {
+	//if rx is enabled, ensure a rx DMA circular mode is set
+	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
+		if(m_huart->hdmarx->Init.Mode != DMA_CIRCULAR){
+			m_huart->hdmarx->Init.Mode = DMA_CIRCULAR;
+			if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
+			{
+				//error handling
+				Error_Handler();
+			}
+		}
+	}
+}
 
 SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  	//check 9bit mode bit is set
@@ -1418,12 +1433,14 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 	m_rx_circular_buf.clear(); //clear the circular buffer before starting a new receive
 	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.buffer, m_rx_circular_buf.bufferSize) != HAL_OK)
 	{
+		m_huart->hdmarx->State=HAL_DMA_STATE_BUSY;//to make sure the next HAL_DMA_Abort
+		HAL_DMA_Abort(m_huart->hdmarx);
 		HAL_UART_AbortReceive(m_huart);
-//		HAL_UART_Abort
-//		if(m_huart->hdmarx->Lock == HAL_LOCKED){
-//			m_huart->hdmarx->Lock = HAL_UNLOCKED;
-//			m_huart->hdmarx->State =  HAL_DMA_STATE_READY;
-//		}
+
+		if(m_huart->hdmarx->Lock == HAL_LOCKED){
+			m_huart->hdmarx->Lock = HAL_UNLOCKED;
+			m_huart->hdmarx->State =  HAL_DMA_STATE_READY;
+		}
 	}
 
 	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_HT); // we don't need half-transfer interrupt
@@ -1500,15 +1517,19 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 
 }
 
+#if ANY_TIMEOUT_TIMER_USED
 void SlimSerial::txrxTimeoutCallback(){
+
 	//notify the txrx thread that a timeout has occurred by setting the notification value bit SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT
    if (txrxThreadID != NULL) {
+	   HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer for half complete callback
 	   uint32_t pulPreviousNotificationValue=0;
 	   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	   xTaskGenericNotifyFromISR((TaskHandle_t)(txrxThreadID),SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT,eSetBits,&pulPreviousNotificationValue,&xHigherPriorityTaskWoken);
 	   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
    }
 };
+#endif
 
 void SlimSerial::callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes){
 	m_rx_time_callback_enter = currentTime_us();
@@ -2077,19 +2098,7 @@ void SlimSerial::frameParser(){
 	m_txrx_time_cost = m_rx_time_end-m_tx_time_start;
 }
 
-void SlimSerial::configRxDMACircularMode() {
-	//if rx is enabled, ensure a rx DMA circular mode is set
-	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
-		if(m_huart->hdmarx->Init.Mode != DMA_CIRCULAR){
-			m_huart->hdmarx->Init.Mode = DMA_CIRCULAR;
-			if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
-			{
-				//error handling
-				Error_Handler();
-			}
-		}
-	}
-}
+
 
 void SlimSerial::rxHandlerThread() {
 	uint32_t ulTaskNotifyRet = 0;
@@ -2115,7 +2124,7 @@ void SlimSerial::rxHandlerThread() {
 
 		if(rxNeedRestart){
 			rxNeedRestart=0;
-			start_Rx_DMA_Idle_Circular();
+//			start_Rx_DMA_Idle_Circular();
 			continue;
 		}
 
@@ -2339,15 +2348,6 @@ void SlimSerial::setBaudrate(uint32_t baudrate){
 }
 #endif
 
-#define ANY_TIMEOUT_TIMER_USED (USART1_TIMEOUT_TIMER_INDEX && \
-		USART1_TIMEOUT_TIMER_INDEX && \
-		USART2_TIMEOUT_TIMER_INDEX && \
-		USART3_TIMEOUT_TIMER_INDEX && \
-		USART4_TIMEOUT_TIMER_INDEX && \
-		USART5_TIMEOUT_TIMER_INDEX && \
-		USART6_TIMEOUT_TIMER_INDEX && \
-		USART7_TIMEOUT_TIMER_INDEX && \
-		USART8_TIMEOUT_TIMER_INDEX)
 
 #define ANY_TIMEOUT_TIMER_INDEX_EQUAL(index) \
 	(SLIMSERIAL_HAL_TICK_TIMER_INDEX == index || \
@@ -2537,7 +2537,19 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 
 		slimSerialDev->restartRxFromISR();
 	}
-
 }
 
+int aa=0;
+void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
+	uint32_t isrflags   = READ_REG(huart->Instance->SR);
+	uint32_t cr3its     = READ_REG(huart->Instance->CR3);
+	uint32_t errorflags = 0x00U;
+	errorflags = (isrflags & (uint32_t)(USART_SR_PE | USART_SR_FE | USART_SR_ORE | USART_SR_NE));
+	if ((errorflags != RESET) && ((cr3its & USART_CR3_EIE) == RESET)){
+	  /* If error interrupt is not enabled, clear the error flags */
+	  __HAL_UART_CLEAR_PEFLAG(huart);
+	  aa++;
+	}
+
+}
 }
