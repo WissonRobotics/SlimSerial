@@ -2539,17 +2539,20 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 	}
 }
 
-int aa=0;
 void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
+
+#if defined(__STM32F0xx_HAL_H)
+	uint32_t isrflags   = READ_REG(huart->Instance->ISR);
+	uint32_t errorflags = (isrflags & (uint32_t)(USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE));
+#elif defined(__STM32F4xx_HAL_H)
 	uint32_t isrflags   = READ_REG(huart->Instance->SR);
+	uint32_t errorflags = (isrflags & (uint32_t)(USART_SR_PE | USART_SR_FE | USART_SR_ORE | USART_SR_NE));
+#endif
 	uint32_t cr3its     = READ_REG(huart->Instance->CR3);
-	uint32_t errorflags = 0x00U;
-	errorflags = (isrflags & (uint32_t)(USART_SR_PE | USART_SR_FE | USART_SR_ORE | USART_SR_NE));
+
 	if ((errorflags != RESET) && ((cr3its & USART_CR3_EIE) == RESET)){
 	  /* If error interrupt is not enabled, clear the error flags */
 	  __HAL_UART_CLEAR_PEFLAG(huart);
-	  aa++;
 	}
-
 }
 }
