@@ -116,8 +116,7 @@ typedef enum
 _Static_assert(USE_HAL_TIM_REGISTER_CALLBACKS==1,"requires HAL_TIM_RegisterCallback to be enabled in ioc file");
 #endif
 
-
-
+typedef uint8_t (*PayloadFunc)(uint8_t *pPayload,bool is9bitsMode);
 
 constexpr TIM_HandleTypeDef* getTimerHandle(uint8_t timer_index);
 
@@ -157,6 +156,8 @@ public:
     void addFuncodeFilter(uint8_t funcode);
 
     /* Transmission functions */
+
+    SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc);
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
@@ -190,6 +191,7 @@ public:
 
 
 
+
 	//usart
 	UART_HandleTypeDef *m_huart;
 
@@ -214,6 +216,9 @@ public:
 	//txrx time record
 	uint32_t m_txrx_time_cost;
 	uint32_t m_tx_once;
+
+	//bits 9 mode
+	uint8_t m_9bits_mode; 				//0: 8 bits mode; 1: 9 bits mode
 
 	void start_Rx_DMA_Idle_Circular();
 	void txCpltCallback();
@@ -264,6 +269,7 @@ private:
 	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
 	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
 
+	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc);
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
@@ -327,8 +333,7 @@ private:
 
 	uint8_t m_address;  				//address in frame
 
-	//bits 9 mode
-	uint8_t m_9bits_mode; 				//0: 8 bits mode; 1: 9 bits mode
+
 	uint8_t m_9bits_mode_address_rx; 	//rx address for 9 bits mode
 	uint8_t m_9bits_mode_address_tx; 	//tx address for 9 bits mode
 	uint8_t m_9bits_mode_error;

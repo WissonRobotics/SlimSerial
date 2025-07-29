@@ -1015,7 +1015,22 @@ uint8_t SlimSerial::getRxFrameType(){
 	return m_rx_frame_type;
 }
 
+SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc){
+	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+		//assemble tx frame in internal buffer,not queued
+		SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payloadFunc);
 
+		//enqueue the buffered data
+		m_tx_queue_meta.push(sd_buf_info);
+
+		//enqueue and transmit
+		return transmitLL();
+	}
+	else{
+		return SD_USART_ERROR;
+	}
+
+}
 
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
 
@@ -1223,6 +1238,77 @@ SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pdata,uint16_t datalen) {
 	}
 }
 
+SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc) {
+	SD_BUF_INFO sd_buf_info;
+
+	uint8_t payloadBytes = 0;
+
+	//next buffer bank
+	m_tx_buf_ind++;
+	if(m_tx_buf_ind>=m_tx_queue_size){
+		m_tx_buf_ind = 0;
+	}
+
+	//assemble data
+	int ind = m_tx_buf_ind*m_tx_queue_buf_single_size;
+	if(m_9bits_mode){
+		uint16_t *pBuf_U16 = ((uint16_t *)m_tx_queue_buf) + ind;
+		sd_buf_info.pdata = (uint8_t *)pBuf_U16;
+
+		//add the address byte with the 9's bit set
+		*pBuf_U16++ = (uint16_t)((address&0x0F) | 0x100);
+
+		//add the header address and payload bytes
+		*pBuf_U16++ = 0x5A;
+		*pBuf_U16++ = 0xA5;
+		*pBuf_U16++ = address;
+		uint16_t *pBuf_U16_payload = pBuf_U16; //save the pointer to the payload length
+		*pBuf_U16++ = payloadBytes;//this will be reset later
+		*pBuf_U16++ = fcode;
+
+		//fill the payload inplace
+		payloadBytes = payloadFunc((uint8_t *)pBuf_U16,true);//it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
+
+		*pBuf_U16_payload = payloadBytes; //set the payload length in the frame
+
+		pBuf_U16 += payloadBytes;
+
+		//calculate CRC (not including the 9-bit address)
+		uint16_t crc = SD_CRC_Calculate_U16LB(((uint16_t *)sd_buf_info.pdata)+1, payloadBytes + 5);
+		*pBuf_U16++ = (uint16_t) (crc &0xFF);
+		*pBuf_U16++ = (uint16_t) ((crc >> 8)&0xFF);
+
+		sd_buf_info.dataBytes= payloadBytes + 7;  //for 9-bit mode, the address byte is not included in the tx dataBytes
+
+	}
+	else{
+		uint8_t *pBuf_U8 =((uint8_t *)m_tx_queue_buf) + ind;
+		sd_buf_info.pdata =pBuf_U8;
+
+		//add the header address and payload bytes
+		*pBuf_U8++ = 0x5A;
+		*pBuf_U8++ = 0xA5;
+		*pBuf_U8++ = address;
+		uint8_t *pBuf_U8_payload = pBuf_U8; //save the pointer to the payload length
+		*pBuf_U8++ = payloadBytes;
+		*pBuf_U8++ = fcode;
+
+		//copy data from U8 to U8 buffer
+ 		payloadBytes = payloadFunc(pBuf_U8,false);
+ 		*pBuf_U8_payload = payloadBytes; //set the payload length in the frame
+ 		pBuf_U8 += payloadBytes;
+
+		//calculate CRC
+		uint16_t crc = SD_CRC_Calculate(sd_buf_info.pdata, payloadBytes + 5);
+		*pBuf_U8++ = (uint8_t) (crc &0xFF);
+		*pBuf_U8++ = (uint8_t)(crc >> 8)&0xFF;
+
+		sd_buf_info.dataBytes= payloadBytes + 7;
+
+	}
+
+	return sd_buf_info;
+}
 SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes) {
 	SD_BUF_INFO sd_buf_info;
 	//next buffer bank
@@ -1542,7 +1628,7 @@ void SlimSerial::callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,ui
 	m_rx_time_callback_cost = currentTime_us() - m_rx_time_callback_enter;
 };
 
-
+uint32_t ttemp[3];
 //frame parser shouldn't care about the 9 bits mode, since it is already handled in lower transmission layer
 void SlimSerial::frameParser(){
 
@@ -1632,9 +1718,10 @@ void SlimSerial::frameParser(){
 								if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 									//valid CRC
+									ttemp[0] = currentTime_us();
 									uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
 									uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
-
+									ttemp[1] = currentTime_us()-ttemp[0];
 									if (crc1 == crc2) {
 
 										//read out one valid frame from ring buffer to m_rx_last
@@ -2124,7 +2211,7 @@ void SlimSerial::rxHandlerThread() {
 
 		if(rxNeedRestart){
 			rxNeedRestart=0;
-//			start_Rx_DMA_Idle_Circular();
+			start_Rx_DMA_Idle_Circular();
 			continue;
 		}
 
