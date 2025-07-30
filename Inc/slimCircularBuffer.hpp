@@ -59,7 +59,7 @@ public:
  
 
 	uint32_t availableData() {
-		return (uint32_t)(head - tail);
+		return (head - tail);
 	}
 
 	//enable overflow wrap
@@ -91,7 +91,7 @@ public:
         }
 
         //if the new head is larger than the last head, no wrap around
-		if(inNewHeadMasked>lastHeadMasked){
+		if(inNewHeadMasked>=lastHeadMasked){
             //no wrap around
 			len =  inNewHeadMasked - lastHeadMasked;
         }

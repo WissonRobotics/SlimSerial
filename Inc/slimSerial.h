@@ -218,7 +218,8 @@ public:
 	uint32_t m_tx_once;
 
 	//bits 9 mode
-	uint8_t m_9bits_mode; 				//0: 8 bits mode; 1: 9 bits mode
+	uint8_t m_9bits_mode; 				//0: 8 bits mode; 1: 9 bits mode. This value may be changed during runtime, for example, when the proxy mode is enabled, the 9 bits mode may be toggled on or off.
+	uint8_t m_9bits_mode_original; 		//0: 8 bits mode; 1: 9 bits mode, this is the original mode when the SlimSerial object is created
 
 	void start_Rx_DMA_Idle_Circular();
 	void txCpltCallback();
@@ -239,7 +240,7 @@ public:
 	void ackProxy();
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void setBaudrate(uint32_t baudrate=0);
-	bool m_enable_9bits_proxy=false; //Indicates the 9 bits mode of the proxy ports. This is differnt from the 9 bits mode of the current port, which is indicated by m_9bits_mode.
+	uint8_t m_enable_9bits_proxy=0; //Indicates the 9 bits mode of the proxy ports. This is differnt from the 9 bits mode of the current port, which is indicated by m_9bits_mode.
 	uint8_t m_proxy_9bit_address=0; //only used when m_enable_9bits_proxy is true, this is the address of the proxy port in 9 bits mode.
 	SlimSerial *m_proxy_port;
 	uint32_t m_last_baudrate;  
@@ -264,7 +265,7 @@ private:
 
 	void configRxDMACircularMode();
 
-	SD_USART_StatusTypeDef config9bitMode();
+	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
 
 	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
 	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);

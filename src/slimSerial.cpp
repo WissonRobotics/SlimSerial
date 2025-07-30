@@ -436,7 +436,8 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_totalTxFrames=0;
 	m_totalRxFrames=0;
 
-	m_9bits_mode = bits_9_mode;
+	m_9bits_mode_original = bits_9_mode; //original 9 bits mode when the SlimSerial object is created
+
 
 	m_enable_rx_wake_up = false;
   
@@ -659,10 +660,15 @@ void SlimSerial::configRxDMACircularMode() {
 	}
 }
 
-SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
+SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
+
  	//check 9bit mode bit is set
- 	if(m_9bits_mode==1){
- 		if(m_huart->Init.WordLength != UART_WORDLENGTH_9B){
+	m_9bits_mode = enable_9bits_mode;
+
+	//set circular buffer 9bits mode
+	m_rx_circular_buf.setU16Mdoe(m_9bits_mode);
+
+ 	if(enable_9bits_mode==1){
 
  			//otherwise, set to 9bit mode
  			m_huart->Init.WordLength = UART_WORDLENGTH_9B;
@@ -672,13 +678,13 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  				m_9bits_mode_error = 1;
  				return SD_USART_ERROR;
  			}
- 		}
+
 
  		//check tx DMA to be 16bit
  		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
- 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
- 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
- 			   ){
+// 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
+// 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
+// 			   ){
  				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
  				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
 
@@ -690,16 +696,16 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  					return SD_USART_ERROR;
  				}
 
- 			}
+// 			}
  		}
 
 
  		//check rx DMA to be 16bit
  		//if rx is enabled, it must use DMA
  		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
- 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
- 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
- 			   ){
+// 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
+// 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
+// 			   ){
 
  				//otherwise, set to 16bit mode
  				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
@@ -712,11 +718,11 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  					m_9bits_mode_error = 1;
  					return SD_USART_ERROR;
  				}
- 			}
+// 			}
  		}
  	}
  	else{
- 		if(m_huart->Init.WordLength != UART_WORDLENGTH_8B){
+// 		if(m_huart->Init.WordLength != UART_WORDLENGTH_8B){
 
 			//otherwise, set to 9bit mode
 			m_huart->Init.WordLength = UART_WORDLENGTH_8B;
@@ -726,13 +732,13 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
 				m_9bits_mode_error = 1;
 				return SD_USART_ERROR;
 			}
-		}
+//		}
 
  		//check tx DMA to be 8bit
  		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
- 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
- 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
- 			   ){
+// 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
+// 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
+// 			   ){
  				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
  				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
  				if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
@@ -741,15 +747,15 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  					m_9bits_mode_error = 1;
  					return SD_USART_ERROR;
  				}
- 			}
+// 			}
  		}
 
  		//check rx DMA to be 8bit
  		//if rx is enabled, it must use DMA
  		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
- 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
- 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
- 			   ){
+// 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
+// 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
+// 			   ){
 
  				//otherwise, set to 8bit mode
  				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
@@ -761,7 +767,7 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(){
  					m_9bits_mode_error = 1;
  					return SD_USART_ERROR;
  				}
- 			}
+// 			}
  		}
  	}
  	return SD_USART_OK;
@@ -1517,6 +1523,10 @@ HAL_StatusTypeDef SlimSerial::Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *
 void SlimSerial::start_Rx_DMA_Idle_Circular(){
 	toggle485Tx(false);
 	m_rx_circular_buf.clear(); //clear the circular buffer before starting a new receive
+	if(m_huart->hdmarx->State==HAL_DMA_STATE_BUSY){
+		HAL_DMA_Abort(m_huart->hdmarx);
+	}
+	HAL_UART_AbortReceive(m_huart);
 	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.buffer, m_rx_circular_buf.bufferSize) != HAL_OK)
 	{
 		m_huart->hdmarx->State=HAL_DMA_STATE_BUSY;//to make sure the next HAL_DMA_Abort
@@ -2194,7 +2204,7 @@ void SlimSerial::rxHandlerThread() {
 
 	configRxDMACircularMode();
 
-	config9bitMode();
+	config9bitMode(m_9bits_mode_original);
 
 #if ANY_TIMEOUT_TIMER_USED
 	configTimeoutTimer();
@@ -2251,12 +2261,11 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
 }
 #if ENABLE_PROXY==1
+int ackN=0;
+uint8_t ackNK=0;
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
-	//if proxy port is in 8 bit mode, we just transmit the data directly. pData is always 8 bits data in m_rx_last.pdata
-	if(!m_enable_9bits_proxy){
-		m_proxy_port->transmitDataLL(pData,databytes);
-	}
-	else{//otherwise, we may need to use a static larger buffer to support large frame size of YModem
+	//for 9 bit proxy mode, we may need to use a static larger buffer to support large frame size of YModem
+	if(m_enable_9bits_proxy){
 		SD_BUF_INFO sd_buf_info = bufferDataToU16withAddress((uint16_t *)m_proxy_buffer, pData, databytes,m_proxy_9bit_address);
 
 		//enqueue the buffered data
@@ -2264,6 +2273,19 @@ void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 
 		m_proxy_port->transmitLL();
 	}
+	else{//if proxy port is in 8 bit mode, we just transmit the data directly. pData is always 8 bits data in m_rx_last.pdata
+
+		if(databytes==1){
+			if(pData[0]==0x06){
+				ackN++;
+			}
+			else if(pData[0]!='o'){
+				ackNK = pData[0];
+			}
+		}
+		m_proxy_port->transmitDataLL(pData,databytes);
+	}
+
 }
 
 void SlimSerial::ackProxy(){
@@ -2328,10 +2350,6 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 			disableProxy();
 		}
 
-		ackProxy();
-
- 		HAL_Delay(2);
-
 		//change settings of current serial port
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
@@ -2349,6 +2367,11 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 		//set the proxy serial port to be 8 bits or 9 bits mode
 		m_enable_9bits_proxy = enable_9bits_proxy;
+
+		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
+		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
+
+
 		if(m_enable_9bits_proxy){
 			m_proxy_9bit_address = proxy_9bit_address;
 			m_proxy_port->config9bitTxAddress(m_proxy_9bit_address);
@@ -2356,7 +2379,13 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 		m_proxy_port->m_enable_9bits_proxy = false;//upstream port is always 8 bits mode
 
+		//clear rx
+		start_Rx_DMA_Idle_Circular();
 
+		m_proxy_port->start_Rx_DMA_Idle_Circular();
+
+
+		ackProxy();
 
 	}
 
@@ -2379,12 +2408,17 @@ void SlimSerial::disableProxy(){
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 		m_proxy_port->m_proxy_port = NULL;
 
-		m_proxy_port->m_enable_9bits_proxy = false;
+		m_proxy_port->m_enable_9bits_proxy = 0;
 
 	}
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;
-	m_enable_9bits_proxy = false;
+	m_enable_9bits_proxy = 0;
+
+	//restore proxy port's original 9bits mode
+	if(m_proxy_port!=NULL){
+		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);
+	}
 }
 
 
