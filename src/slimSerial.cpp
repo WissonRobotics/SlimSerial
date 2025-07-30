@@ -770,6 +770,9 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
 // 			}
  		}
  	}
+
+ 	start_Rx_DMA_Idle_Circular(); //restart the rx DMA in idle circular mode
+
  	return SD_USART_OK;
 }
 
@@ -2204,15 +2207,15 @@ void SlimSerial::rxHandlerThread() {
 
 	configRxDMACircularMode();
 
-	config9bitMode(m_9bits_mode_original);
-
 #if ANY_TIMEOUT_TIMER_USED
 	configTimeoutTimer();
 #endif
 
 	osDelay(20);
 
-	start_Rx_DMA_Idle_Circular();
+
+	config9bitMode(m_9bits_mode_original);
+//	start_Rx_DMA_Idle_Circular();//already called in config9bitMode()
 
 	/* Infinite loop */
 	for (;;) {
@@ -2368,10 +2371,6 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		//set the proxy serial port to be 8 bits or 9 bits mode
 		m_enable_9bits_proxy = enable_9bits_proxy;
 
-		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
-		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
-
-
 		if(m_enable_9bits_proxy){
 			m_proxy_9bit_address = proxy_9bit_address;
 			m_proxy_port->config9bitTxAddress(m_proxy_9bit_address);
@@ -2379,12 +2378,8 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 		m_proxy_port->m_enable_9bits_proxy = false;//upstream port is always 8 bits mode
 
-		//clear rx
-		start_Rx_DMA_Idle_Circular();
-
-		m_proxy_port->start_Rx_DMA_Idle_Circular();
-
-
+		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
+		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
 		ackProxy();
 
 	}
