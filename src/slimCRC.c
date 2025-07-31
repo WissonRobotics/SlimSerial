@@ -58,3 +58,16 @@ uint16_t SD_CRC_Calculate(uint8_t *buffer, uint16_t datasize)
 
 	return crc;
 }
+
+
+uint16_t SD_CRC_Calculate_U16LB(uint16_t *buffer, uint16_t datasize)
+{
+
+	uint16_t crc=0xFFFF;
+	const uint16_t *p=buffer;
+
+	while (datasize--)
+		crc = crc16_table[(crc ^ (*p++ & 0xFF)) & 0xFF] ^ (crc >> 8);
+
+	return crc;
+}

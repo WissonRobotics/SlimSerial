@@ -15,7 +15,7 @@
 #include "stdint.h"
  extern const uint16_t crc16_table[256];
  extern uint16_t SD_CRC_Calculate(uint8_t *buffer, uint16_t datasize);
-
+ extern uint16_t SD_CRC_Calculate_U16LB(uint16_t *buffer, uint16_t datasize);
 
 #ifdef __cplusplus
 }
