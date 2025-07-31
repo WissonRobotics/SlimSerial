@@ -4,7 +4,7 @@
 #include <main.h>
 #include "stdio.h"
 #include "usart.h"
-#include "tim.h"
+
 #include "math.h"
 #include "cmsis_os.h"
 #include <functional>
@@ -113,6 +113,7 @@ typedef enum
 
 
 #if ANY_TIMEOUT_TIMER_USED
+#include "tim.h"
 _Static_assert(USE_HAL_TIM_REGISTER_CALLBACKS==1,"requires HAL_TIM_RegisterCallback to be enabled in ioc file");
 #endif
 
