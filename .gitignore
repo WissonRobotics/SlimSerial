@@ -90,3 +90,5 @@ cmake-build-*/
 /.vs
 /out/build
 /CMakeSettings.json
+
+.settings/language.settings.xml
