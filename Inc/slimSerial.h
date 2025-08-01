@@ -126,9 +126,8 @@ class SlimSerial{
 public:
 
 	SlimSerial(UART_HandleTypeDef *uartHandle,
-			uint16_t 		*tx_queue_buf,
-			uint16_t 		tx_queue_buf_single_size,
-			uint16_t		 tx_queue_meta_size,
+			uint16_t   *tx_circular_buf,
+			uint16_t  tx_circular_buf_size,
 			uint16_t   *rx_circular_buf,
 			uint16_t  rx_circular_buf_size,
 			uint8_t  *rx_frame,
@@ -158,7 +157,7 @@ public:
 
     /* Transmission functions */
 
-    SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc);
+    SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
@@ -245,7 +244,7 @@ public:
 	uint8_t m_proxy_9bit_address=0; //only used when m_enable_9bits_proxy is true, this is the address of the proxy port in 9 bits mode.
 	SlimSerial *m_proxy_port;
 	uint32_t m_last_baudrate;  
-	static uint16_t m_proxy_buffer[SLIMSERIAL_PROXY_BUFFER_SIZE]; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
+	static SLIM_CURCULAR_BUFFER m_proxy_circular_buffer; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
 #endif
 
 private:
@@ -268,14 +267,12 @@ private:
 
 	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
 
-	SD_BUF_INFO bufferDataToU16withAddress(uint16_t *pDes,uint8_t *pSrc,uint16_t datalen,uint8_t prefix_address);
-	SD_BUF_INFO bufferDataTo(uint8_t *pDes,uint8_t *pSrc,uint16_t datalen);
 
-	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc);
+	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
 	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
-	SD_BUF_INFO bufferTxData(uint8_t *pdata,uint16_t dataBytes);
-	SD_BUF_INFO queueTxData(uint8_t *pdata,uint16_t dataBytes);
+	SD_BUF_INFO bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen);
+	SD_BUF_INFO bufferTxData(uint8_t *pSrc,uint16_t datalen);
 
 	SD_USART_StatusTypeDef transmitLL();
 
@@ -314,18 +311,17 @@ private:
 
 	bool lengthFilterOn;
 
-	//Tx queue buffer
-	uint16_t  *m_tx_queue_buf;
-	uint16_t  m_tx_queue_buf_single_size;
-	uint16_t  m_tx_queue_size;
-	uint16_t  m_tx_buf_ind;
-	static_queue<SD_BUF_INFO, 3> m_tx_queue_meta;
-	SD_BUF_INFO m_tx_last;
+	//Tx circular buffer
+	SLIM_CURCULAR_BUFFER m_tx_circular_buf;
 
 	//rx circular buffer
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
 
-	//rx data
+	//tx data
+	static_queue<SD_BUF_INFO, 5> m_tx_queue_meta;
+	SD_BUF_INFO m_tx_last;
+
+	//rx frame data
 	SD_BUF_INFO m_rx_last;
 	uint8_t  *m_rx_frame_buf;
 	uint16_t m_rx_frame_buf_size;

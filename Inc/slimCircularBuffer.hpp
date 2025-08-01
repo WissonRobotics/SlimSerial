@@ -49,14 +49,13 @@ public:
 	 * in this mode, the buffer will be treated as an array of uint16_t
 	 */
 	void setU16Mdoe(uint8_t u16Mode){
-		m_U16_Mode = u16Mode;
+		m_U16_mode = u16Mode;
 	}
 
 	void clear() {
 		head = 0;
 		tail = 0;
 	}
- 
 
 	uint32_t availableData() {
 		return (head - tail);
@@ -79,7 +78,19 @@ public:
 	}
 
 
-	uint32_t in_dummyU16_with_new_head(uint32_t inNewHeadMasked) {
+	uint32_t in_dummy(uint32_t len) {
+		uint32_t ltemp = unusedSpace();
+
+		head += len;
+
+		uint32_t loverflow = (len > ltemp) ? len - ltemp : 0;
+		tail += loverflow;
+
+		return len;
+	}
+
+	//called in the DMA callback to update the buffer head and tail
+	uint32_t in_dummy_with_new_masked_head(uint32_t inNewHeadMasked) {
 		uint32_t lastHeadMasked = head & mask;
 
 		//determine new arrived data len
@@ -126,7 +137,7 @@ public:
 		}
 
 		//discard the data if the 9th bit address byte if set
-		if(m_U16_Mode && ((bufferU16[tail & mask]>>8) & 0x01)==1){
+		if(m_U16_mode && ((bufferU16[tail & mask]>>8) & 0x01)==1){
 			tail++;
 			len--;
 		}
@@ -163,7 +174,7 @@ public:
 
 	//always return U8. if in U16 mode, only the lower byte is returned
 	inline uint8_t peekAt(uint32_t index) {
-		if (m_U16_Mode) {
+		if (m_U16_mode) {
             return (uint8_t)(bufferU16[(tail + index) & mask] & 0xFF);
         }
 		else{
@@ -173,7 +184,7 @@ public:
 
 	//always return U8. if in U16 mode, only the lower byte is returned
 	inline uint8_t peekAt_HB(uint32_t index) {
-		if (m_U16_Mode) {
+		if (m_U16_mode) {
             return (uint8_t)(bufferU16[(tail + index) & mask]>>8 & 0xFF);
         }
 		else{
@@ -227,15 +238,27 @@ public:
 		return ((head - tail) > mask);
 	}
 
-	uint32_t unusedContinuousSpace() {
+	inline uint32_t unusedContinuousSpace() {
 		uint32_t off = tail & mask;
 
 		return (uint32_t)(bufferSize - off);
 	}
 
 
-	//in U16 mode, only the lower byte is used for CRC calculation
+	//calculate CRC16 for the data [tail, tail+dataSize].
 	uint16_t calculateCRC(uint32_t datasize) {
+		//in U16 mode, only the lower byte is used for CRC calculation
+		uint16_t crc=0xFFFF;
+		int j=0;
+		while (datasize--)
+			crc = crc16_table[(crc ^ peekAt(j++)) & 0xFF] ^ (crc >> 8);
+
+		return crc;
+
+	}
+
+	//calculate CRC16 for the data [maskedStart, maskedStart+dataSize].
+	uint16_t calculateCRC(uint32_t maskedStart,uint32_t datasize) {
 
 		uint16_t crc=0xFFFF;
 		int j=0;
@@ -246,6 +269,13 @@ public:
 
 	}
 
+	/**
+	 * slim_memcpy will copy
+	 * - uint8_t to uint8_t
+	 * - uint16_t to uint16_t
+	 * - uint8_t to uint16_t
+	 * - uint16_t to uint8_t (only the lower byte is copied)
+	 */
 	template<typename  T1,typename  T2>
 	requires (IsUint8OrUint16<T1> && IsUint8OrUint16<T2>)
 	static void slim_memcpy(T1 *des, const T2 *src, size_t len){
@@ -265,17 +295,26 @@ public:
          }
     }
 
+	inline uint8_t *getHeadMasked() {
+        return m_U16_mode?(uint8_t *)((bufferU16 + (head & mask))):(uint8_t *)((buffer + (head & mask)));
+    }
+
+	inline uint8_t *getTailMasked() {
+        return m_U16_mode?(uint8_t *)((bufferU16 + (tail & mask))):(uint8_t *)((buffer + (tail & mask)));
+    }
+
 	uint8_t		*buffer;
 	uint16_t	*bufferU16;
 	uint32_t	bufferSize;
-	uint8_t     m_U16_Mode=0;
-
+	uint8_t     m_U16_mode=0;
 private:
 
+
+
+	uint32_t	mask;
 	uint32_t	head;
 	uint32_t	tail;
-	
-	uint32_t	mask;
+
 
 	template<typename  T>
 	requires IsUint8OrUint16<T>
@@ -290,7 +329,7 @@ private:
 
 		ltemp = len < tm ? len : tm;
 
-		if (m_U16_Mode) {
+		if (m_U16_mode) {
             slim_memcpy(bufferU16 + off, pSrc, ltemp);
             slim_memcpy(bufferU16, pSrc + ltemp, len - ltemp);
             return;
@@ -314,7 +353,7 @@ private:
 
 		ltemp = len < tm ? len : tm;
 
-		if (m_U16_Mode) {
+		if (m_U16_mode) {
             slim_memcpy(pDes, bufferU16 + off, ltemp);
             slim_memcpy(pDes + ltemp, bufferU16, len - ltemp);
             return;
