@@ -268,8 +268,8 @@ private:
 	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
 
 
-	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
-	SD_BUF_INFO bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes);
+	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
+	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen);
 	SD_BUF_INFO bufferTxData(uint8_t *pSrc,uint16_t datalen);
@@ -318,7 +318,7 @@ private:
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
 
 	//tx data
-	static_queue<SD_BUF_INFO, 5> m_tx_queue_meta;
+	static_queue<SD_BUF_INFO, 20> m_tx_queue_meta;
 	SD_BUF_INFO m_tx_last;
 
 	//rx frame data

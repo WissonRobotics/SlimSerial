@@ -1194,8 +1194,6 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 		return SD_USART_ERROR;
 	}
 }
-
-
 //buffer data to a circular buffer, with address byte in 9-bit mode if the circular buffer is in U16 mode
 SD_BUF_INFO SlimSerial::bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen) {
 
@@ -1226,7 +1224,7 @@ SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pSrc,uint16_t datalen) {
 	return bufferTxData(m_tx_circular_buf, pSrc, datalen);
 }
 
-SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes) {
+SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes) {
 
 	SD_BUF_INFO sd_buf_info;
 	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame prefix and CRC
@@ -1246,12 +1244,12 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFun
 	}
 
 	//add frame prefix
-	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, payloadBytes, fcode};
+	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, (uint8_t)payloadBytes, fcode};
 	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
 
 	//add the payload
 	if(m_9bits_mode){
-		payloadFunc(((uint16_t *)sd_buf_info.pdata)+6, true); //it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
+		payloadFunc((uint8_t *)(((uint16_t *)sd_buf_info.pdata)+6), true); //it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
 	}
 	else{
 		payloadFunc(((uint8_t *)sd_buf_info.pdata)+5, false);
@@ -1267,7 +1265,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,PayloadFun
 }
 
 
-SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes) {
+SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *payload,uint16_t payloadBytes) {
 	SD_BUF_INFO sd_buf_info;
 	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame prefix and CRC
 
@@ -1286,7 +1284,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint16_t address,uint16_t fcode,uint8_t *p
 	}
 
 	//add frame prefix
-	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, payloadBytes, fcode};
+	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, (uint8_t)payloadBytes, fcode};
 	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
 
 	//add the payload
@@ -2186,7 +2184,7 @@ int ackN=0;
 uint8_t ackNK=0;
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 
-	if((databytes+1)>m_proxy_port->m_tx_circular_buf.bufferSize){
+	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
 		SD_BUF_INFO sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
 		//enqueue the buffered data
 		m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
@@ -2514,9 +2512,9 @@ extern "C" {
 
 /*Redirect printf() by implementing _write  or  fputc based on different compiler*/
 #if defined(__GNUC__) && defined(PRINTF_SERIAL)
-int _write(int file, char *pSrc, int len){
-	return PRINTF_SERIAL.transmitData((uint8_t *)pSrc,len);
-}
+//int _write(int file, char *pSrc, int len){
+//	return PRINTF_SERIAL.transmitData((uint8_t *)pSrc,len);
+//}
 #elif defined (__CC_ARM)
 int fputc(int ch, FILE *f)
 {

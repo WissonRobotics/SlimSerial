@@ -171,7 +171,6 @@ public:
 	}
 
 
-
 	//always return U8. if in U16 mode, only the lower byte is returned
 	inline uint8_t peekAt(uint32_t index) {
 		if (m_U16_mode) {
@@ -258,16 +257,16 @@ public:
 	}
 
 	//calculate CRC16 for the data [maskedStart, maskedStart+dataSize].
-	uint16_t calculateCRC(uint32_t maskedStart,uint32_t datasize) {
-
-		uint16_t crc=0xFFFF;
-		int j=0;
-		while (datasize--)
-			crc = crc16_table[(crc ^ peekAt(j++)) & 0xFF] ^ (crc >> 8);
-
-		return crc;
-
-	}
+//	uint16_t calculateCRC(uint32_t maskedStart,uint32_t datasize) {
+//
+//		uint16_t crc=0xFFFF;
+//		int j=0;
+//		while (datasize--)
+//			crc = crc16_table[(crc ^ peekAt(j++)) & 0xFF] ^ (crc >> 8);
+//
+//		return crc;
+//
+//	}
 
 	/**
 	 * slim_memcpy will copy
