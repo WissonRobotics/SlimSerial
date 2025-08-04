@@ -150,7 +150,7 @@
 #if defined(__STM32F0xx_HAL_H)
 #define SLIMSERIAL_HAL_TICK_TIMER_INDEX 	 6	//htim6 is used for HAL_Tick()
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
-#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       256    // rx task stack size
+#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       128    // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     2
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    2

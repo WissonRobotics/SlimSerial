@@ -1037,10 +1037,10 @@ uint8_t SlimSerial::getRxFrameType(){
 	return m_rx_frame_type;
 }
 
-SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes){
+SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
 		//assemble tx frame in internal buffer,not queued
-		SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payloadFunc,payloadBytes);
+		SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payloadFunc);
 
 		//enqueue the buffered data
 		m_tx_queue_meta.push(sd_buf_info);
@@ -1231,18 +1231,18 @@ SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pSrc,uint16_t datalen) {
 	return bufferTxData(m_tx_circular_buf, pSrc, datalen);
 }
 
-SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes) {
+SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc) {
 
 	SD_BUF_INFO sd_buf_info;
-	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame prefix and CRC
+	uint8_t payloadBytes=0;
 
 	//if not enough continuous space in the circular buffer, add a dummy data to the circular buffer to ensure the next in() will be at the new head position
-	if((frameBytes+1u)>m_tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
+	if(m_tx_circular_buf.unusedContinuousSpace()<m_tx_circular_buf.bufferSize/2){//less than half of the buffer is available
 		m_tx_circular_buf.in_dummy_with_new_masked_head(0);
 	}
 
 	sd_buf_info.pdata = m_tx_circular_buf.getHeadMasked();
-	sd_buf_info.dataBytes = frameBytes;
+
 
 	//for 9-bit mode, add address byte with 9's bit set first
 	if(m_9bits_mode){
@@ -1250,23 +1250,32 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc 
 		m_tx_circular_buf.in((uint16_t *)(&addressU16),1);
 	}
 
-	//add frame prefix
-	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, (uint8_t)payloadBytes, fcode};
+	//add frame prefix with 0 payloadBytes
+	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, payloadBytes, fcode};
 	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
 
 	//add the payload
 	if(m_9bits_mode){
-		payloadFunc((uint8_t *)(((uint16_t *)sd_buf_info.pdata)+6), true); //it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
+		payloadBytes = payloadFunc((uint8_t *)(((uint16_t *)sd_buf_info.pdata)+6), true); //it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
 	}
 	else{
-		payloadFunc(((uint8_t *)sd_buf_info.pdata)+5, false);
+		payloadBytes = payloadFunc(((uint8_t *)sd_buf_info.pdata)+5, false);
 	}
 	m_tx_circular_buf.in_dummy(payloadBytes); //add the payload bytes
-	//m_tx_circular_buf.in(payload,payloadBytes);
+
+	//update the payload bytes in the frame prefix
+	if(m_9bits_mode){
+		((uint16_t *)sd_buf_info.pdata)[4] = payloadBytes; //update the payload bytes in the frame prefix
+	}
+	else{
+		sd_buf_info.pdata[3] = payloadBytes; //update the payload bytes in the frame prefix
+	}
 
 	//add CRC (not including the 9-bit address)
 	uint16_t crcU16= m_9bits_mode?SD_CRC_Calculate_U16LB(((uint16_t *)sd_buf_info.pdata)+1, payloadBytes + 5):SD_CRC_Calculate(sd_buf_info.pdata, payloadBytes + 5);
 	m_tx_circular_buf.in((uint8_t *)(&crcU16),2); //add the CRC bytes
+
+	sd_buf_info.dataBytes = payloadBytes + 7;
 
 	return sd_buf_info;
 }

@@ -158,7 +158,7 @@ public:
 
     /* Transmission functions */
 
-    SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
+    SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc);
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
@@ -269,7 +269,7 @@ private:
 	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
 
 
-	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc,uint16_t payloadBytes);
+	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc);
 	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *payload,uint16_t payloadBytes);
 
 	SD_BUF_INFO bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen);
