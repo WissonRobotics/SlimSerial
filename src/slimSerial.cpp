@@ -44,6 +44,7 @@ uint8_t USART1_RX_FRAME_BUFFER[USART1_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL1_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial1(&huart1,
 		(uint16_t *)USART1_TX_CIRCULAR_BUFFER,USART1_TX_CIRCULAR_BUFFER_SIZE,
@@ -92,6 +93,7 @@ uint8_t USART2_RX_FRAME_BUFFER[USART2_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL2_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial2(&huart2,
 		(uint16_t *)USART2_TX_CIRCULAR_BUFFER,USART2_TX_CIRCULAR_BUFFER_SIZE,
@@ -139,6 +141,7 @@ uint8_t USART3_RX_FRAME_BUFFER[USART3_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL3_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial3(&huart3,
 		(uint16_t *)USART3_TX_CIRCULAR_BUFFER,USART3_TX_CIRCULAR_BUFFER_SIZE,
@@ -186,6 +189,7 @@ uint8_t USART4_RX_FRAME_BUFFER[USART4_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL4_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial4(&huart4,
 		(uint16_t *)USART4_TX_CIRCULAR_BUFFER,USART4_TX_CIRCULAR_BUFFER_SIZE,
@@ -232,7 +236,7 @@ uint8_t USART5_RX_FRAME_BUFFER[USART5_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
-
+#define SLIMSERIAL5_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 SlimSerial slimSerial5(&huart5,
 		(uint16_t *)USART5_TX_CIRCULAR_BUFFER,USART5_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART5_RX_CIRCULAR_BUFFER,USART5_RX_CIRCULAR_BUFFER_SIZE,
@@ -277,6 +281,7 @@ uint8_t USART6_RX_FRAME_BUFFER[USART6_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL6_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial6(&huart6,
 		(uint16_t *)USART6_TX_CIRCULAR_BUFFER,USART6_TX_CIRCULAR_BUFFER_SIZE,
@@ -322,6 +327,7 @@ uint8_t USART7_RX_FRAME_BUFFER[USART7_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL7_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial7(&huart7,
 		(uint16_t *)USART7_TX_CIRCULAR_BUFFER,USART7_TX_CIRCULAR_BUFFER_SIZE,
@@ -345,6 +351,7 @@ uint16_t USART8_TX_CIRCULAR_BUFFER[USART8_TX_CIRCULAR_BUFFER_SIZE];
 uint16_t USART8_RX_CIRCULAR_BUFFER[USART8_RX_CIRCULAR_BUFFER_SIZE];
 #endif
 
+
 uint8_t USART8_RX_FRAME_BUFFER[USART8_RX_FRAME_MAX_SIZE];
 #if USART8_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_0_ANY
 #ifndef SLIMSERIAL_FRAME_TYPE_0_ANY_USED
@@ -367,6 +374,7 @@ uint8_t USART8_RX_FRAME_BUFFER[USART8_RX_FRAME_MAX_SIZE];
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
 #endif
+#define SLIMSERIAL8_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 
 SlimSerial slimSerial8(&huart8,
 		(uint16_t *)USART8_TX_CIRCULAR_BUFFER,USART8_TX_CIRCULAR_BUFFER_SIZE,
@@ -467,8 +475,8 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 //	readMtx = xSemaphoreCreateMutexStatic( &readMtxBuffer );
 
 	//thread
-	rxThreadID = 0;
-	txrxThreadID = 0;
+	rxThreadID = NULL;
+	txrxThreadID = NULL;
 
 	debugOutputEnable=1;
 
@@ -487,7 +495,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
 
 	/* definition and creation of PCInTask */
-	if(m_rx_mode>0){
+	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
 		createRxTasks();
 	}
 
@@ -833,61 +841,60 @@ void SlimSerial::config9bitTxAddress(uint8_t tx_address){
  const osThreadDef_t_modified os_thread_def_##name = \
  { #name, (thread), (priority), (instances), (stacksz), (buffer), (control) }
 
- uint16_t rxTasksize=(m_rx_mode==1?SLIMSERIAL_RX_TASK_BUFFER_SIZE:SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL);
 
 #if ENABLE_SLIMSERIAL_USART1
 	if(m_huart==&huart1){
 
-		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL1_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx1Task), &slimSerial1);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART2
 	if(m_huart==&huart2){
-		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityLow, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityLow, 0, SLIMSERIAL2_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx2Task), &slimSerial2);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART3
 	if(m_huart==&huart3){
-		osThreadStaticDef_modified(rx3Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx3Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL3_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx3Task), &slimSerial3);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART4
 	if(m_huart==&huart4){
-		osThreadStaticDef_modified(rx4Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx4Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL4_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx4Task), &slimSerial4);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART5
 	if(m_huart==&huart5){
-		osThreadStaticDef_modified(rx5Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx5Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL5_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx5Task), &slimSerial5);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART6
 	if(m_huart==&huart6){
-		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityNormal, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityNormal, 0, SLIMSERIAL6_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx6Task), &slimSerial6);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART7
 	if(m_huart==&huart7){
-		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL7_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx7Task), &slimSerial7);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART8
 	if(m_huart==&huart8){
-		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityHigh, 0, rxTasksize, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL8_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx8Task), &slimSerial8);
 		return HAL_OK;
 	}
@@ -1300,8 +1307,6 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 
 
 
-
-
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
 		m_rx_status = SD_USART_ERROR;
@@ -1318,43 +1323,31 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 	if(frameTypeFilterOn==false)
 		m_rx_frame_type = SLIMSERIAL_FRAME_TYPE_0_ANY;
 
-
-	//only if not in the same thread
-	if(rxThreadID !=  (uint32_t *) osThreadGetId()){
-		txrxThreadID = (uint32_t *) osThreadGetId();
-		//clear previous nofification value that every valid frame would trigger
-		xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));//ulTaskNotifyValueClear((TaskHandle_t)(txrxThreadID),0xffffffff);
-	}
+	txrxThreadID = (uint32_t *) osThreadGetId();
+	//clear previous nofification value that every valid frame would trigger
+	xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));
 
 	//setup accurate timeout timer ifconfigured
 #if ANY_TIMEOUT_TIMER_USED
 	setTimeout(timeout_ms);
 #endif
+
 	//start a tx frame
 	transmitData(pData, dataBytes);
 
-	//only wait for rx nofification if not in the same thread
-	if(txrxThreadID != rxThreadID){
-		uint32_t temp =  std::lround(timeout_ms);
-		uint32_t timeoutMS = (temp==1) ? temp+1: temp; //1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
-		uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,timeoutMS);//we are waiting for the setTimer timeout to notify a value SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT.
+	//1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
+	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,std::max(2l,std::lround(timeout_ms)));
 
-		//timout from ulTask timeout or  from the timer
-		if(ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0){
-			m_rx_last.dataBytes=0;
-			m_txrx_time_cost = currentTime_us()-m_tx_time_start;
-			if (m_rx_status==SD_USART_BUSY){
-				m_rx_status = SD_USART_TIMEOUT;
-			}
-		}
-		else {//from rx frame notification give(increment by 1)
-			m_rx_status = SD_USART_OK;
 
-		}
+	if(ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_FRAME){
+		m_rx_status = SD_USART_OK;
 	}
-	else{
-		HAL_Delay(10);
-
+	else{//ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT) || (ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_RESTART)
+		m_rx_last.dataBytes=0;
+		m_txrx_time_cost = currentTime_us()-m_tx_time_start;
+		if (m_rx_status==SD_USART_BUSY){
+			m_rx_status = SD_USART_TIMEOUT;
+		}
 	}
 
 #if ANY_TIMEOUT_TIMER_USED
@@ -1363,6 +1356,9 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 	//restore frame type
 	m_rx_frame_type = rxFrameType_temp;
+
+	//clear txrx threadID
+	txrxThreadID = nullptr;
 
 	return m_rx_last;
 }
@@ -1374,16 +1370,12 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
- 
 	//record txrx threadID
 	m_rx_status = SD_USART_BUSY;
 
-	//only if not in the same thread
-	if(rxThreadID !=  (uint32_t *) osThreadGetId()){
-		txrxThreadID = (uint32_t *) osThreadGetId();
-		//clear previous nofification value that every valid frame would trigger
-		xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));//ulTaskNotifyValueClear((TaskHandle_t)(txrxThreadID),0xffffffff);
-	}
+	txrxThreadID = (uint32_t *) osThreadGetId();
+	//clear previous nofification value that every valid frame would trigger
+	xTaskNotifyStateClear((TaskHandle_t)(txrxThreadID));
 
 	//setup accurate timeout timer ifconfigured
 #if ANY_TIMEOUT_TIMER_USED
@@ -1391,36 +1383,31 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 #endif
 
 	//start a tx frame
-	transmitFrame(address, fcode,payload,payloadBytes);
+	transmitFrame(address, fcode, payload, payloadBytes);
 
-	//only wait for rx nofification if not in the same thread
-	if(txrxThreadID != rxThreadID){
-		uint32_t temp =  std::lround(timeout_ms);
-		uint32_t timeoutMS = (temp==1) ? temp+1: temp; //1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
-		uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,timeoutMS);
-		//timout
-		if(ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT)!=0){
-			m_rx_last.dataBytes=0;
-			m_txrx_time_cost = currentTime_us()-m_tx_time_start;
-			if (m_rx_status==SD_USART_BUSY){
-				m_rx_status = SD_USART_TIMEOUT;
-			}
-		}
-		else {//from rx frame notification give(increment by 1)
-			m_rx_status = SD_USART_OK;
+	//1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
+	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,std::max(2l,std::lround(timeout_ms)));
 
-		}
+
+	if(ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_FRAME){
+		m_rx_status = SD_USART_OK;
 	}
-	else{
-		HAL_Delay(10);
+	else{//ulTaskNotifyRet==0 || (ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT) || (ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_RESTART)
+		m_rx_last.dataBytes=0;
+		m_txrx_time_cost = currentTime_us()-m_tx_time_start;
+		if (m_rx_status==SD_USART_BUSY){
+			m_rx_status = SD_USART_TIMEOUT;
+		}
 	}
 
 #if ANY_TIMEOUT_TIMER_USED
 	stopTimeout(); //stop the timer
 #endif
 
-	return m_rx_last;
+	//clear txrx threadID
+	txrxThreadID = nullptr;
 
+	return m_rx_last;
 }
 
 
@@ -1442,6 +1429,9 @@ HAL_StatusTypeDef SlimSerial::Slim_UARTEx_ReceiveToIdle_DMA(UART_HandleTypeDef *
 void SlimSerial::start_Rx_DMA_Idle_Circular(){
 	toggle485Tx(false);
 	m_rx_circular_buf.clear(); //clear the circular buffer before starting a new receive
+#if ANY_TIMEOUT_TIMER_USED
+	stopTimeout(); //stop the timeout timer if it is running
+#endif
 	if(m_huart->hdmarx->State==HAL_DMA_STATE_BUSY){
 		HAL_DMA_Abort(m_huart->hdmarx);
 	}
@@ -1494,7 +1484,6 @@ void SlimSerial::txCpltCallback()
 	//dequeue the last tx info
 	m_tx_queue_meta.pop();
 
-
 	//trigger another tx if tx queue is not empty. Don't access back() if the queue is empty.
 	if(!m_tx_queue_meta.empty()){
 		transmitLL();
@@ -1510,24 +1499,17 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 	m_rx_time_start = currentTime_us();
 	m_tx_once=0;
 	
-
 	//get current buffer index based on current NDTR
 	//NDTR   N 	 	N-1 	N-2 	N-3 	N-4    	...	  	1
 	//head   0		1		2		3	    4	 	...		N-1
-
 	uint32_t exactHead = m_rx_circular_buf.bufferSize - (uint16_t)__HAL_DMA_GET_COUNTER(m_huart->hdmarx);
 	uint32_t dlen = m_rx_circular_buf.in_dummy_with_new_masked_head(exactHead); //dummy in to update the circular buffer size
 	m_totalRxBytes += dlen;
 
-	if(m_rx_mode==1){
+	if(rxThreadID != NULL) {
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-		vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
-
+		xTaskGenericNotifyFromISR((TaskHandle_t)(rxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL,&xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
-	else if(m_rx_mode==2){
-		frameParser();
 	}
 
 }
@@ -1535,12 +1517,12 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 #if ANY_TIMEOUT_TIMER_USED
 void SlimSerial::txrxTimeoutCallback(){
 
-	//notify the txrx thread that a timeout has occurred by setting the notification value bit SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT
+	stopTimeout(); //stop the timer if use half complete callback
+
+	//notify the txrx thread that a timeout has occurred by setting the notification value bit SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT
    if (txrxThreadID != NULL) {
-	   HAL_TIM_Base_Stop_IT(m_timeout_htim); //stop the timer for half complete callback
-	   uint32_t pulPreviousNotificationValue=0;
 	   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	   xTaskGenericNotifyFromISR((TaskHandle_t)(txrxThreadID),SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT,eSetBits,&pulPreviousNotificationValue,&xHigherPriorityTaskWoken);
+	   xTaskGenericNotifyFromISR((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT,eSetBits,NULL,&xHigherPriorityTaskWoken);
 	   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
    }
 };
@@ -1593,16 +1575,8 @@ void SlimSerial::frameParser(){
 			callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
 			//notify potential txrx thread
-			if(m_rx_mode==1){
-				if (txrxThreadID != NULL) {
-					xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-				}
-			}
-			else if(m_rx_mode==2){
-				if (txrxThreadID != NULL) {
-					BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-					xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-				}
+			if (txrxThreadID != NULL) {
+				xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
 			}
 
 			m_rx_status = SD_USART_OK;
@@ -1685,17 +1659,10 @@ void SlimSerial::frameParser(){
 										else{
 #endif
 											callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
-												//notify potential txrx thread
-											if(m_rx_mode==1){
-												if (txrxThreadID != NULL) {
-													xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-												}
-											}
-											else if(m_rx_mode==2){
-												if (txrxThreadID != NULL) {
-													BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-													xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-												}
+
+											//notify potential txrx thread
+											if (txrxThreadID != NULL) {
+												xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
 											}
 
 											m_rx_status = SD_USART_OK;
@@ -1830,19 +1797,9 @@ void SlimSerial::frameParser(){
 
 							callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
-
-
 							//notify potential txrx thread
-							if(m_rx_mode==1){
-								if (txrxThreadID != NULL) {
-									xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-								}
-							}
-							else if(m_rx_mode==2){
-								if (txrxThreadID != NULL) {
-									BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-									xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-								}
+							if (txrxThreadID != NULL) {
+								xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
 							}
 
 							m_rx_status = SD_USART_OK;
@@ -1931,19 +1888,9 @@ void SlimSerial::frameParser(){
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
-
-
 								//notify potential txrx thread
-								if(m_rx_mode==1){
-									if (txrxThreadID != NULL) {
-										xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-									}
-								}
-								else if(m_rx_mode==2){
-									if (txrxThreadID != NULL) {
-										BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-										xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-									}
+								if (txrxThreadID != NULL) {
+									xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
 								}
 								m_rx_status = SD_USART_OK;
 								continue;
@@ -2047,19 +1994,9 @@ void SlimSerial::frameParser(){
 
 								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
 
-
-
 								//notify potential txrx thread
-								if(m_rx_mode==1){
-									if (txrxThreadID != NULL) {
-										xTaskNotify((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite);
-									}
-								}
-								else if(m_rx_mode==2){
-									if (txrxThreadID != NULL) {
-										BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-										xTaskNotifyFromISR((TaskHandle_t )txrxThreadID, 1, eSetValueWithOverwrite,&xHigherPriorityTaskWoken);
-									}
+								if (txrxThreadID != NULL) {
+									xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
 								}
 
 								m_rx_status = SD_USART_OK;
@@ -2117,7 +2054,7 @@ void SlimSerial::frameParser(){
 
 
 void SlimSerial::rxHandlerThread() {
-	uint32_t ulTaskNotifyRet = 0;
+	uint32_t ulTaskNotifyValue = 0;
 	 /*get ready for receive*/
 	rxThreadID = (uint32_t *)osThreadGetId();
 
@@ -2129,29 +2066,21 @@ void SlimSerial::rxHandlerThread() {
 
 	osDelay(20);
 
-
 	config9bitMode(m_9bits_mode_original);
 //	start_Rx_DMA_Idle_Circular();//already called in config9bitMode()
 
 	/* Infinite loop */
 	for (;;) {
 
-		ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		//get notification value and clear it
+		ulTaskNotifyValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-		if(rxNeedRestart){
-			rxNeedRestart=0;
+		if(ulTaskNotifyValue & SLIMSERIAL_NOTIFICATION_BIT_RESTART) {
 			start_Rx_DMA_Idle_Circular();
 			continue;
 		}
 
-		if (!(ulTaskNotifyRet && m_rx_circular_buf.availableData()>0))
-			continue;
-
-		if(m_rx_mode==1){
-			frameParser();
-		}
-
-
+		frameParser();
 	}
 }
 
@@ -2162,16 +2091,12 @@ uint32_t SlimSerial::getRxFrameIdleTimeUs(){
 	return currentTime_us()- m_rx_time_validFrame;
 }
 
-
-
 void SlimSerial::restartRxFromISR(){
-	rxNeedRestart=1;
 	if(rxThreadID != NULL) {
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		vTaskNotifyGiveFromISR((TaskHandle_t)(rxThreadID),&xHigherPriorityTaskWoken);
+		xTaskGenericNotifyFromISR((TaskHandle_t)(rxThreadID),SLIMSERIAL_NOTIFICATION_BIT_RESTART,eSetBits,NULL,&xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
-
 }
 
 SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {

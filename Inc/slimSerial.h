@@ -108,8 +108,9 @@ typedef enum
 		USART7_TIMEOUT_TIMER_INDEX || \
 		USART8_TIMEOUT_TIMER_INDEX)
 
-
-#define SLIMSERIAL_TIMEOUT_NOTIFICATION_BIT 0x80
+#define SLIMSERIAL_NOTIFICATION_BIT_FRAME 	0x01
+#define SLIMSERIAL_NOTIFICATION_BIT_RESTART 0x40
+#define SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT 0x80
 
 
 #if ANY_TIMEOUT_TIMER_USED
@@ -363,8 +364,6 @@ private:
 
     //tx method.
     uint8_t m_tx_mode;//0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
-
-	uint8_t rxNeedRestart;
 
 	//rx frame type
 	uint8_t m_rx_frame_type;

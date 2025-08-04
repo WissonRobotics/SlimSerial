@@ -10,10 +10,9 @@
 
 
 //SlimSerial Rx Mode
-// 0: disable rx ;  1:enable rx in task;  2:enable rx in interrupt.
-#define SLIMSERIAL_RX_MODE_OFF   0
-#define SLIMSERIAL_RX_MODE_TASK  1
-#define SLIMSERIAL_RX_MODE_INT   2
+// 0: disable rx ;  1:enable rx in DMA mode;
+#define SLIMSERIAL_RX_MODE_OFF  0
+#define SLIMSERIAL_RX_MODE_DMA  1
 
 //SlimSerial Rx Frame Type
 /*
