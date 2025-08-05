@@ -845,14 +845,14 @@ void SlimSerial::config9bitTxAddress(uint8_t tx_address){
 #if ENABLE_SLIMSERIAL_USART1
 	if(m_huart==&huart1){
 
-		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL1_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx1Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL1_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx1Task), &slimSerial1);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART2
 	if(m_huart==&huart2){
-		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityLow, 0, SLIMSERIAL2_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx2Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL2_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx2Task), &slimSerial2);
 		return HAL_OK;
 	}
@@ -880,21 +880,21 @@ void SlimSerial::config9bitTxAddress(uint8_t tx_address){
 #endif
 #if ENABLE_SLIMSERIAL_USART6
 	if(m_huart==&huart6){
-		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityNormal, 0, SLIMSERIAL6_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx6Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL6_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx6Task), &slimSerial6);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART7
 	if(m_huart==&huart7){
-		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL7_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx7Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL7_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx7Task), &slimSerial7);
 		return HAL_OK;
 	}
 #endif
 #if ENABLE_SLIMSERIAL_USART8
 	if(m_huart==&huart8){
-		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityHigh, 0, SLIMSERIAL8_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
+		osThreadStaticDef_modified(rx8Task, rxTaskFuncImpl, osPriorityAboveNormal, 0, SLIMSERIAL8_RX_TASK_BUFFER_SIZE, rxTaskBuffer, &rxTaskControlBlock);
 		rxTaskHandle = osThreadCreate((const osThreadDef_t *)osThread(rx8Task), &slimSerial8);
 		return HAL_OK;
 	}
