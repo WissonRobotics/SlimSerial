@@ -1520,6 +1520,7 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 		xTaskGenericNotifyFromISR((TaskHandle_t)(rxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL,&xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
+	m_rx_time_task_switch_pre = currentTime_us() - m_rx_time_start;
 
 }
 
@@ -1548,9 +1549,14 @@ void SlimSerial::callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,ui
 	m_rx_time_callback_cost = currentTime_us() - m_rx_time_callback_enter;
 };
 
-uint32_t ttemp[3];
+uint32_t ttemp[3]={0,0,0};
 //frame parser shouldn't care about the 9 bits mode, since it is already handled in lower transmission layer
 void SlimSerial::frameParser(){
+
+
+	if(m_rx_time_task_switch>50){
+		ttemp[2]++;
+	}
 
 	////discard the 9th bit address byte if necessary
 	if(m_9bits_mode && m_rx_circular_buf.peekAt_HB(0)==1){
@@ -1648,6 +1654,7 @@ void SlimSerial::frameParser(){
 
 										m_rx_time_validFrame = currentTime_us();
 										m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
+
 #if ENABLE_PROXY==1
 										if(funcodeIn == FUNC_ENABLE_PROXY_INTERNAL){
 											//enable proxy
@@ -2083,6 +2090,8 @@ void SlimSerial::rxHandlerThread() {
 
 		//get notification value and clear it
 		ulTaskNotifyValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		m_rx_time_task_switch = currentTime_us() - m_rx_time_start;
+
 
 		if(ulTaskNotifyValue & SLIMSERIAL_NOTIFICATION_BIT_RESTART) {
 			start_Rx_DMA_Idle_Circular();

@@ -208,6 +208,8 @@ public:
 	uint32_t m_rx_time_validFrame_cost;
 	uint32_t m_rx_time_callback_enter;
 	uint32_t m_rx_time_callback_cost;
+	uint32_t m_rx_time_task_switch;
+	uint32_t m_rx_time_task_switch_pre;
 
 	//tx time record
 	uint32_t m_tx_time_start;
