@@ -237,7 +237,7 @@ public:
 
 #if ENABLE_PROXY==1
 	void enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudrate,uint8_t enable_node_address,uint8_t node_address);
-	void disableProxy();
+	void disableProxy(bool ackFlag = true);
 	void ackProxy();
 	void proxyDelegateMessage(uint8_t *pData,uint16_t databytes);
 	void setBaudrate(uint32_t baudrate=0);

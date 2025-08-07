@@ -2189,7 +2189,7 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 	if(proxy_port_){
 
 		if(m_proxy_port!=NULL && m_proxy_port!=proxy_port_){
-			disableProxy();
+			disableProxy(false);//disable previous proxy without ack
 		}
 
 		//change settings of current serial port
@@ -2219,22 +2219,26 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
 		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
+
+		//send acknowledgment
 		ackProxy();
 
 	}
 
 }
-void SlimSerial::disableProxy(){
+void SlimSerial::disableProxy(bool ackFlag){
 
 
 	if(m_proxy_port!=NULL){
 
 		//disable in chain
-		ackProxy();
- 		HAL_Delay(2);
-
+ 		//TODO: Send the disable command to the proxy network with m_9bits_mode_original or m_9bits_mode?
 		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY_INTERNAL,NULL,0);
-		HAL_Delay(10);
+
+		HAL_Delay(2);//wait for 2ms to let the command be sent out
+
+		//restore proxy port's original 9bits mode
+		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);
 
 		//restore baudrate if necessary
 		m_proxy_port->setBaudrate();
@@ -2245,16 +2249,17 @@ void SlimSerial::disableProxy(){
 		m_proxy_port->m_enable_9bits_proxy = 0;
 
 	}
+
+
 	m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 	m_proxy_port = NULL;
 	m_enable_9bits_proxy = 0;
 
-	//restore proxy port's original 9bits mode
-	if(m_proxy_port!=NULL){
-		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);
+	//send  acknowledgment
+	if(ackFlag){
+		ackProxy();
 	}
 }
-
 
 //0 for original baudrate
 void SlimSerial::setBaudrate(uint32_t baudrate){
