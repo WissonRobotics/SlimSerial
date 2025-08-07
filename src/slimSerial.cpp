@@ -1456,9 +1456,9 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 			m_huart->hdmarx->State =  HAL_DMA_STATE_READY;
 		}
 	}
-
-	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_HT); // we don't need half-transfer interrupt
-	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_TC); // we don't need transfer complete interrupt
+	// we don't need half-transfer interrupt.
+	// And we must enable the DMA_IT_TC, otherwise we will miss certain rxcallback.(We won't miss any data, since we are in circular mode)
+	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_HT);
 
 }
 
@@ -1520,8 +1520,6 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 		xTaskGenericNotifyFromISR((TaskHandle_t)(rxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL,&xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
-	m_rx_time_task_switch_pre = currentTime_us() - m_rx_time_start;
-
 }
 
 #if ANY_TIMEOUT_TIMER_USED
@@ -1549,19 +1547,40 @@ void SlimSerial::callRxCallbackArray(SlimSerial *slimSerialDev,uint8_t *pdata,ui
 	m_rx_time_callback_cost = currentTime_us() - m_rx_time_callback_enter;
 };
 
-uint32_t ttemp[3]={0,0,0};
+
+void SlimSerial::rxHandlerThread() {
+	uint32_t ulTaskNotifyValue = 0;
+	 /*get ready for receive*/
+	rxThreadID = (uint32_t *)osThreadGetId();
+
+	configRxDMACircularMode();
+
+#if ANY_TIMEOUT_TIMER_USED
+	configTimeoutTimer();
+#endif
+
+	osDelay(20);
+
+	config9bitMode(m_9bits_mode_original);
+//	start_Rx_DMA_Idle_Circular();//already called in config9bitMode()
+
+	/* Infinite loop */
+	for (;;) {
+
+		//get notification value and clear it
+		ulTaskNotifyValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+		if(ulTaskNotifyValue & SLIMSERIAL_NOTIFICATION_BIT_RESTART) {
+			start_Rx_DMA_Idle_Circular();
+			continue;
+		}
+
+		frameParser();
+	}
+}
+
 //frame parser shouldn't care about the 9 bits mode, since it is already handled in lower transmission layer
 void SlimSerial::frameParser(){
-
-
-	if(m_rx_time_task_switch>50){
-		ttemp[2]++;
-	}
-
-	////discard the 9th bit address byte if necessary
-	if(m_9bits_mode && m_rx_circular_buf.peekAt_HB(0)==1){
-		m_rx_circular_buf.discardN(1);
-	}
 
 	m_parse_remainingBytes=m_rx_circular_buf.availableData();
 
@@ -1608,8 +1627,6 @@ void SlimSerial::frameParser(){
 		if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
 			while (m_parse_remainingBytes >= 7) {
 
-
-
 				//check header, current support 5A A5 and FF FF
 				uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
 				if (applyHeaderFilter(header[0], header[1])) {
@@ -1636,10 +1653,8 @@ void SlimSerial::frameParser(){
 								if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 									//valid CRC
-									ttemp[0] = currentTime_us();
 									uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
 									uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
-									ttemp[1] = currentTime_us()-ttemp[0];
 									if (crc1 == crc2) {
 
 										//read out one valid frame from ring buffer to m_rx_last
@@ -2069,38 +2084,6 @@ void SlimSerial::frameParser(){
 
 
 
-void SlimSerial::rxHandlerThread() {
-	uint32_t ulTaskNotifyValue = 0;
-	 /*get ready for receive*/
-	rxThreadID = (uint32_t *)osThreadGetId();
-
-	configRxDMACircularMode();
-
-#if ANY_TIMEOUT_TIMER_USED
-	configTimeoutTimer();
-#endif
-
-	osDelay(20);
-
-	config9bitMode(m_9bits_mode_original);
-//	start_Rx_DMA_Idle_Circular();//already called in config9bitMode()
-
-	/* Infinite loop */
-	for (;;) {
-
-		//get notification value and clear it
-		ulTaskNotifyValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-		m_rx_time_task_switch = currentTime_us() - m_rx_time_start;
-
-
-		if(ulTaskNotifyValue & SLIMSERIAL_NOTIFICATION_BIT_RESTART) {
-			start_Rx_DMA_Idle_Circular();
-			continue;
-		}
-
-		frameParser();
-	}
-}
 
 uint32_t SlimSerial::getRxIdleTimeUs(){
 	return currentTime_us()- m_rx_time_end;
@@ -2478,7 +2461,6 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 	}
 }
 
-
 /*this function would overwrite HAL's weak HAL_UARTEx_RxEventCallback for all usart*/
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t data_len)
 {
@@ -2486,9 +2468,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t data_len)
 	if(slimSerialDev){
 			slimSerialDev->rxCpltCallback(data_len);
 	}
-
 }
-
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 
@@ -2502,7 +2482,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		slimSerialDev->restartRxFromISR();
 	}
 }
-
 void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
 
 #if defined(__STM32F0xx_HAL_H)
