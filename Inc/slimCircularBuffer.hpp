@@ -93,13 +93,13 @@ public:
 	uint32_t in_dummy_with_new_masked_head(uint32_t inNewHeadMasked) {
 		uint32_t lastHeadMasked = head & mask;
 
-		//determine new arrived data len
-		uint32_t len=0;
-
 		//If two interrupts are triggered together, IDLE line and DMA_IT_TC callback. we ignore one.
 		if(inNewHeadMasked==0 && lastHeadMasked==0){
             return 0;
         }
+
+		//determine new arrived data len
+		uint32_t len=0;
 
         //if the new head is larger than the last head, no wrap around
 		if(inNewHeadMasked>=lastHeadMasked){

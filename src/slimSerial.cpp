@@ -1456,10 +1456,11 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 			m_huart->hdmarx->State =  HAL_DMA_STATE_READY;
 		}
 	}
-	// we don't need half-transfer interrupt.
-	// And we must enable the DMA_IT_TC, otherwise we will miss certain rxcallback.(We won't miss any data, since we are in circular mode)
+	//we don't need half-transfer interrupt.
 	__HAL_DMA_DISABLE_IT(m_huart->hdmarx, DMA_IT_HT);
 
+	//We do need the DMA_IT_TC, otherwise we will miss certain rxcallback in STM32F0 series because of the inconsistant behavior of HAL's HAL_UART_IRQHandler() between F0 and F4.(We won't miss any data, since we are in circular mode)
+	//
 }
 
 
