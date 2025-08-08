@@ -1482,6 +1482,15 @@ SD_BUF_INFO &SlimSerial::modbusRead(uint8_t des, uint16_t reg_address,uint16_t r
 	return transmitReceiveData(&readFrame[0],sizeof(readFrame),timeoutMS);
 }
 
+SD_BUF_INFO &SlimSerial::modbusWrite(uint8_t des, uint16_t reg_address,uint16_t reg_data,uint16_t timeoutMS){
+	std::array<uint8_t,8> writeFrame={des,0x06,(uint8_t)(reg_address>>8),(uint8_t)(reg_address&0xFF),(uint8_t)(reg_data>>8),(uint8_t)(reg_data&0xFF),0,0};
+	uint16_t crc = SD_CRC_Calculate(&writeFrame[0], 6);
+	writeFrame[6] = (uint8_t) (crc &0xFF);
+	writeFrame[7] = (uint8_t)(crc >> 8)&0xFF;
+
+	return transmitReceiveData(&writeFrame[0],sizeof(writeFrame),timeoutMS);
+}
+
 
 
 void SlimSerial::txCpltCallback()
