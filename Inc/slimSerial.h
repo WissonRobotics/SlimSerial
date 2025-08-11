@@ -196,6 +196,7 @@ public:
 
 	//usart
 	UART_HandleTypeDef *m_huart;
+	uint8_t m_slimSerialIndex; //index of the SlimSerial object, used to identify the SlimSerial object in the system
 
 	//timeout timer
 	TIM_HandleTypeDef *m_timeout_htim;
@@ -226,6 +227,7 @@ public:
 	void start_Rx_DMA_Idle_Circular();
 	void txCpltCallback();
 	void rxCpltCallback(uint16_t data_len);
+	void errorCallback();
 	void txrxTimeoutCallback();
 	void restartRxFromISR();
 
@@ -276,6 +278,7 @@ private:
 	SD_BUF_INFO bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen);
 	SD_BUF_INFO bufferTxData(uint8_t *pSrc,uint16_t datalen);
 
+	SD_USART_StatusTypeDef transmitLL_try();
 	SD_USART_StatusTypeDef transmitLL();
 
 	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
@@ -371,8 +374,25 @@ private:
 	uint8_t m_rx_frame_type_ori;
 
 	//synchronization tools
-	bool writeLocked = false;
+	StaticSemaphore_t m_txMutexBuffer;
+	SemaphoreHandle_t m_txMutex = NULL;
 
+	StaticSemaphore_t m_txrxMutexBuffer;
+	SemaphoreHandle_t m_txrxMutex = NULL;
+	uint32_t m_txrxMutex_aquire_failed_count = 0; //how many times the txrx mutex is failed to be acquired, used to detect potential deadlock
+	uint32_t m_txrxMutex_aquire_time_us = 0; //time when the txrx mutex is acquired, used to calculate the txrx time cost
+
+
+	bool m_writeLocked = false;
+	uint32_t m_writeLock_last_true_time_us= 0; //time when the last write lock is acquired, used to timeout the write lock
+	uint32_t m_writeLock_last_reset_time_threshold_us = 200000u;
+	uint32_t m_writeLock_reset_count = 0;
+	uint32_t m_writeLock_busy_count = 0; //how many times the write lock is busy, used to detect potential deadlock
+	uint32_t m_writeLock_busy_elapsed_us = 0; //how long the write lock is busy, used to detect potential deadlock
+
+	uint8_t m_tx_queue_max_used_size = 0;
+
+	//rx task
     bool txrxLocked = false;
 
 	//txrx task ID
