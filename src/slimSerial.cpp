@@ -3,6 +3,8 @@
 #include "stdio.h"
 #include "cmsis_os.h"
 #include <type_traits>
+#include <format>
+#include "RTT_LOG.h"
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #define USART1_TX_CIRCULAR_BUFFER_SIZE USART1_TX_FRAME_MAX_SIZE*2
@@ -387,7 +389,7 @@ uint16_t SLIMSERIAL_PROXY_CIRCULAR_BUFFER[SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE]
 SLIM_CURCULAR_BUFFER SlimSerial::m_proxy_circular_buffer={(uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,0};
 #endif
 
-
+static uint8_t getSlimSerialIndex(UART_HandleTypeDef *huart);
 
 SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 			uint16_t   *tx_circular_buf,
@@ -410,6 +412,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
  {
 
 	m_huart = uartHandle;
+	m_slimSerialIndex = getSlimSerialIndex(m_huart);
+
+
 
 	//rx data
 	m_rx_frame_buf = rx_frame_buf;
@@ -486,6 +491,12 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
  	m_timeout_htim = getTimerHandle(m_timeout_htim_index);
 
 
+ 	m_txrxMutex = xSemaphoreCreateMutexStatic(&m_txrxMutexBuffer);
+
+ 	m_txMutex = xSemaphoreCreateMutexStatic(&m_txMutexBuffer);
+
+ 	m_writeLocked = false; //tx mutex is not locked at the beginning
+
 
 	/* definition and creation of PCInTask */
 	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
@@ -554,6 +565,38 @@ inline SlimSerial *getSlimSerial(TIM_HandleTypeDef *htim){
 	#endif
 	//if not found, return NULL
 	return NULL;
+}
+
+
+static inline uint8_t getSlimSerialIndex(UART_HandleTypeDef *huart){
+#if ENABLE_SLIMSERIAL_USART1
+	if(huart==&huart1){return 1;}
+#endif
+#if ENABLE_SLIMSERIAL_USART2
+	if(huart==&huart2){return 2;}
+	#endif
+#if ENABLE_SLIMSERIAL_USART3
+	if(huart==&huart3){return 3;}
+#endif
+#if ENABLE_SLIMSERIAL_USART4
+	if(huart==&huart4){return 4;}
+#endif
+#if ENABLE_SLIMSERIAL_USART5
+	if(huart==&huart5){return 5;}
+#endif
+#if ENABLE_SLIMSERIAL_USART6
+	if(huart==&huart6){return 6;}
+#endif
+#if ENABLE_SLIMSERIAL_USART7
+	if(huart==&huart7){return 7;}
+#endif
+#if ENABLE_SLIMSERIAL_USART8
+	if(huart==&huart8){return 8;}
+#endif
+
+	//if not found, return NULL
+	return 0;
+
 }
 
 #if ANY_TIMEOUT_TIMER_USED
@@ -1055,7 +1098,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 		m_tx_queue_meta.push(sd_buf_info);
 
 		//enqueue and transmit
-		return transmitLL();
+		return transmitLL_try();
 	}
 	else{
 		return SD_USART_ERROR;
@@ -1094,7 +1137,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fco
 	m_tx_queue_meta.push(sd_buf_info);
 
 	//enqueue and transmit
-	return transmitLL();
+	return transmitLL_try();
 }
 
 SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBytes){
@@ -1105,8 +1148,8 @@ SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBy
 	//enqueue the buffered data
 	m_tx_queue_meta.push(sd_buf_info);
 
-	//enqueue and transmit
-	return transmitLL();
+	//enqueue and try to trigger a transmit
+	return transmitLL_try();
 }
 
 uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout){
@@ -1117,7 +1160,7 @@ uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeo
 
 	uint32_t timeoutPoint= HAL_GetTick()+timeout+1;
 	while( leftN >0 ){
-		thisN = m_rx_circular_buf.out(&pdata[readN], leftN);
+		thisN = m_rx_circular_buf.out((uint8_t *)(&pdata[readN]), leftN);
 		readN +=thisN;
 		leftN -=thisN;
 		if(HAL_GetTick() >= timeoutPoint){
@@ -1129,12 +1172,38 @@ uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeo
 
 
 }
+
+inline SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
+	if (!m_writeLocked) {
+		//if get the mutex, try to transmit
+		m_writeLocked=true;
+		m_writeLock_last_true_time_us = currentTime_us();
+		return transmitLL();
+	}
+	else{
+
+		//if the write lock is taken for more than 500ms, may encounter a tx deadlock. reset the lock
+		if(currentTime_us() - m_writeLock_last_true_time_us > m_writeLock_last_reset_time_threshold_us){
+
+			//should not happen, but if it does, reset the lock
+			m_writeLocked=true;
+			m_writeLock_last_true_time_us = currentTime_us();
+
+			//
+			m_writeLock_reset_count++;
+			return transmitLL();
+		}
+		m_writeLock_busy_count++;
+		m_writeLock_busy_elapsed_us = currentTime_us() - m_writeLock_last_true_time_us;
+		return SD_USART_BUSY; //if the mutex is not taken, return busy
+	}
+
+}
+
 SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 
 	//try to trigger a transmit one the queue's back. This will not take effect is the Tx is already ongoing
 	m_tx_time_start = currentTime_us();
-
-	m_tx_once++;
 
 	toggle485Tx(true);
 	HAL_StatusTypeDef ret=HAL_OK;
@@ -1331,6 +1400,20 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
+
+	//need txrxmutex
+	uint32_t t1 = currentTime_us();
+	if(xSemaphoreTake(m_txrxMutex, std::lround(timeout_ms)) != pdTRUE){
+		m_rx_status = SD_USART_TIMEOUT;
+		m_rx_last.dataBytes=0;
+		m_txrxMutex_aquire_time_us= std::lround(timeout_ms)*1000;
+		m_txrxMutex_aquire_failed_count++;
+		return  m_rx_last;
+	}
+	m_txrxMutex_aquire_time_us= currentTime_us() - t1;
+
+	timeout_ms-= m_txrxMutex_aquire_time_us/1000.0f; //reduce the timeout by the time taken to acquire the mutex
+
 	//record txrx threadID
 	m_rx_status = SD_USART_BUSY;
 
@@ -1378,6 +1461,9 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 	//clear txrx threadID
 	txrxThreadID = nullptr;
 
+	//release txrx mutex
+	xSemaphoreGive(m_txrxMutex);
+
 	return m_rx_last;
 }
 
@@ -1388,6 +1474,19 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
+
+	//need txrxmutex
+	uint32_t t1 = currentTime_us();
+	if(xSemaphoreTake(m_txrxMutex, std::lround(timeout_ms)) != pdTRUE){
+		m_rx_status = SD_USART_TIMEOUT;
+		m_rx_last.dataBytes=0;
+		m_txrxMutex_aquire_time_us= std::lround(timeout_ms)*1000;
+		return  m_rx_last;
+	}
+	m_txrxMutex_aquire_time_us= currentTime_us() - t1;
+
+	timeout_ms-= m_txrxMutex_aquire_time_us/1000.0f; //reduce the timeout by the time taken to acquire the mutex
+
 	//record txrx threadID
 	m_rx_status = SD_USART_BUSY;
 
@@ -1424,6 +1523,9 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 
 	//clear txrx threadID
 	txrxThreadID = nullptr;
+
+	//release txrx mutex
+	xSemaphoreGive(m_txrxMutex);
 
 	return m_rx_last;
 }
@@ -1509,13 +1611,25 @@ void SlimSerial::txCpltCallback()
 	m_totalTxBytes += m_tx_last.dataBytes;
 	m_totalTxFrames ++;
 
+	//record the max used size of the tx queue
+	m_tx_queue_max_used_size = m_tx_queue_meta.size()>m_tx_queue_max_used_size? m_tx_queue_meta.size() : m_tx_queue_max_used_size;
+
 	//dequeue the last tx info
 	m_tx_queue_meta.pop();
 
+
+
 	//trigger another tx if tx queue is not empty. Don't access back() if the queue is empty.
 	if(!m_tx_queue_meta.empty()){
-		transmitLL();
+		transmitLL(); //transmit the next frame without taking the mutex, since we are already in the transmit context
 	}
+	else{
+		// Give the mutex back. if no more data to transmit, we can release the mutex
+//		xSemaphoreGiveFromISR(m_txMutex,NULL);
+		m_writeLocked=false;
+	}
+
+
 }
 
 //In circular mode, this callback is called when
@@ -1539,6 +1653,15 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 		xTaskGenericNotifyFromISR((TaskHandle_t)(rxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL,&xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
+}
+
+void SlimSerial::errorCallback()
+{
+	//normally this is all about rx error.
+	//clear rx error flag
+	__HAL_UART_CLEAR_PEFLAG(m_huart);
+
+	restartRxFromISR();
 }
 
 #if ANY_TIMEOUT_TIMER_USED
@@ -2124,22 +2247,30 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
 }
 #if ENABLE_PROXY==1
-int ackN=0;
-uint8_t ackNK=0;
+
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 	SD_BUF_INFO sd_buf_info;
 	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
 		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
+		LOG_INFO("Serial%d -> Serial%d, databytes = %d bytes, index= %d",m_slimSerialIndex,m_proxy_port->m_slimSerialIndex,sd_buf_info.dataBytes);
+		if(databytes==1){
+			LOG_ARRAY_BLUE(sd_buf_info.pdata,sd_buf_info.dataBytes,0);
+		}
 	}
 	else{
 		//buffer data into internal m_tx_circular_buffer
 		sd_buf_info=m_proxy_port->bufferTxData(pData,databytes);
+		LOG_INFO("Serial%d -> Serial%d, databytes = %d bytes:",m_slimSerialIndex,m_proxy_port->m_slimSerialIndex,sd_buf_info.dataBytes);
+		if(databytes==1){
+			LOG_ARRAY_GREEN(sd_buf_info.pdata,sd_buf_info.dataBytes,0);
+		}
 	}
 	//enqueue the buffered data
 	m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
 
 	//enqueue and transmit
-	m_proxy_port->transmitLL();
+	m_proxy_port->transmitLL_try();
+
 
 }
 
@@ -2501,11 +2632,8 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 	//restart
 	SlimSerial *slimSerialDev=getSlimSerial(huart);
 	if(slimSerialDev){
+		slimSerialDev->errorCallback();
 
-		//clear rx error flag
-		__HAL_UART_CLEAR_PEFLAG(huart);
-
-		slimSerialDev->restartRxFromISR();
 	}
 }
 void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
