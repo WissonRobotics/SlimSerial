@@ -2,9 +2,9 @@
 #include <slimSerial.h>
 #include "stdio.h"
 #include "cmsis_os.h"
-#include <type_traits>
-#include <format>
-#include "RTT_LOG.h"
+//#include <type_traits>
+//#include <format>
+//#include "RTT_LOG.h"
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #define USART1_TX_CIRCULAR_BUFFER_SIZE USART1_TX_FRAME_MAX_SIZE*2
@@ -437,6 +437,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_totalTxFrames=0;
 	m_totalRxFrames=0;
 
+	m_tx_circular_buf_data = (uint8_t *)tx_circular_buf;
+	m_tx_circular_buf_size = tx_circular_buf_size;
+
 	m_9bits_mode_original = bits_9_mode; //original 9 bits mode when the SlimSerial object is created
 
 
@@ -493,10 +496,13 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
  	m_txrxMutex = xSemaphoreCreateMutexStatic(&m_txrxMutexBuffer);
 
- 	m_txMutex = xSemaphoreCreateMutexStatic(&m_txMutexBuffer);
-
  	m_writeLocked = false; //tx mutex is not locked at the beginning
 
+ 	//tx queue
+ 	m_tx_queue_meta = xQueueCreateStatic( SLIMSERIAL_TX_QUEUE_MAX_LEN,
+                                 sizeof(SD_BUF_INFO),
+								 m_tx_queue_meta_data_buf,
+                                 &m_tx_queue_meta_data );
 
 	/* definition and creation of PCInTask */
 	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
@@ -706,17 +712,19 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
 
 	//set rx circular buffer 9bits mode
 	m_rx_circular_buf.clear(); //clear the circular buffer first
-	m_rx_circular_buf.setU16Mdoe(m_9bits_mode);
+	m_rx_circular_buf.setU16Mode(m_9bits_mode);
 
 	//set tx circular buffer 9bits mode
 	m_tx_circular_buf.clear(); //clear the circular buffer first
-	m_tx_circular_buf.setU16Mdoe(m_9bits_mode);
+	m_tx_circular_buf.setU16Mode(m_9bits_mode);
 
 	//set proxy circular buffer 9bits mode
 	#if ENABLE_PROXY==1
 	m_proxy_circular_buffer.clear(); //clear the circular buffer first
-	m_proxy_circular_buffer.setU16Mdoe(m_9bits_mode);
+	m_proxy_circular_buffer.setU16Mode(m_9bits_mode);
 	#endif
+
+	xQueueReset(m_tx_queue_meta); //clear the tx queue meta data
 
  	if(enable_9bits_mode==1){
 
@@ -1089,13 +1097,14 @@ uint8_t SlimSerial::getRxFrameType(){
 	return m_rx_frame_type;
 }
 
+//transmit a frame if in normal mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
 		//assemble tx frame in internal buffer,not queued
 		SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payloadFunc);
 
 		//enqueue the buffered data
-		m_tx_queue_meta.push(sd_buf_info);
+		xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
 
 		//enqueue and transmit
 		return transmitLL_try();
@@ -1106,6 +1115,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 
 }
 
+//transmit a frame if in normal mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
 
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
@@ -1127,26 +1137,27 @@ SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataByte
 	}
 }
 
-//this function will be executed in an async thread
+//transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
 
 	//buffer data into internal m_tx_circular_buffer, with frame_prefix and crc added
 	SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payload,payloadBytes);
 
 	//enqueue the buffered data
-	m_tx_queue_meta.push(sd_buf_info);
+	xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
 
 	//enqueue and transmit
 	return transmitLL_try();
 }
 
+//transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBytes){
 
 	//buffer data into internal m_tx_circular_buffer
 	SD_BUF_INFO sd_buf_info=bufferTxData(pdata,dataBytes);
 
 	//enqueue the buffered data
-	m_tx_queue_meta.push(sd_buf_info);
+	xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
 
 	//enqueue and try to trigger a transmit
 	return transmitLL_try();
@@ -1173,34 +1184,46 @@ uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeo
 
 }
 
-inline SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
+//trying to send tx queue with tx mutex acquired first
+SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
 	if (!m_writeLocked) {
-		//if get the mutex, try to transmit
-		m_writeLocked=true;
-		m_writeLock_last_true_time_us = currentTime_us();
-		return transmitLL();
+		if(pdPASS == xQueueReceive(m_tx_queue_meta, &(m_tx_last), 0)){
+			//get the last tx buffer info from the queue
+			m_writeLocked=true;
+			m_writeLock_last_true_time_us = currentTime_us();
+			return transmitLL(m_tx_last);
+		}
+		else{
+			return SD_USART_EMPTY; //if the queue is empty, return empty
+		}
 	}
 	else{
 
 		//if the write lock is taken for more than 500ms, may encounter a tx deadlock. reset the lock
 		if(currentTime_us() - m_writeLock_last_true_time_us > m_writeLock_last_reset_time_threshold_us){
 
-			//should not happen, but if it does, reset the lock
-			m_writeLocked=true;
-			m_writeLock_last_true_time_us = currentTime_us();
-
-			//
 			m_writeLock_reset_count++;
-			return transmitLL();
+
+			if(pdPASS == xQueueReceive(m_tx_queue_meta, &(m_tx_last), 0)){
+				//get the last tx buffer info from the queue
+				m_writeLocked=true;
+				m_writeLock_last_true_time_us = currentTime_us();
+				return transmitLL(m_tx_last);
+			}
+			else{
+				return SD_USART_EMPTY; //if the queue is empty, return empty
+			}
 		}
 		m_writeLock_busy_count++;
 		m_writeLock_busy_elapsed_us = currentTime_us() - m_writeLock_last_true_time_us;
 		return SD_USART_BUSY; //if the mutex is not taken, return busy
 	}
-
 }
 
-SD_USART_StatusTypeDef SlimSerial::transmitLL(){
+//send data directly, used in txCpltCallback() to transmit the next queued frame without releasing/aquiring the mutex again
+SD_USART_StatusTypeDef SlimSerial::transmitLL(SD_BUF_INFO &txBufInfo){
+
+	m_tx_last = txBufInfo; //save the last transmitted buffer info
 
 	//try to trigger a transmit one the queue's back. This will not take effect is the Tx is already ongoing
 	m_tx_time_start = currentTime_us();
@@ -1209,13 +1232,10 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 	HAL_StatusTypeDef ret=HAL_OK;
 
 	if(m_9bits_mode){
-			uint16_t *pbuf=(uint16_t*)(m_tx_queue_meta.back().pdata);
-			uint16_t databytes=m_tx_queue_meta.back().dataBytes + 1; //for 9-bit mode, the address byte is not included in the tx dataBytes
+			uint16_t *pbuf=(uint16_t*)(m_tx_last.pdata);
+			uint16_t databytes=m_tx_last.dataBytes + 1; //for 9-bit mode, the address byte is not included in the tx dataBytes
 		 if(m_tx_mode==SLIMSERIAL_TX_MODE_BLOCK){
-			//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
 			USART_TypeDef *uart = m_huart->Instance;
-
-
 			while(databytes-->0){
 	#if defined(__STM32F0xx_HAL_H)
 				uart->TDR =  *pbuf;
@@ -1225,13 +1245,10 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 				pbuf++;
 				while(!__HAL_UART_GET_FLAG(m_huart, UART_FLAG_TC));
 			}
-
-
 			if(Tx_EN_Port){
-					Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
+				Tx_EN_Port->BSRR = (uint32_t)Tx_EN_Pin << 16U;
 			}
 			txCpltCallback();
-
 		}
 		else if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
 			ret=HAL_UART_Transmit_DMA(m_huart,(const uint8_t *)pbuf,databytes);
@@ -1241,8 +1258,9 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 		}
 	}
 	else{
-		uint8_t *pbuf=m_tx_queue_meta.back().pdata;
-		uint16_t databytes=m_tx_queue_meta.back().dataBytes;
+
+		uint8_t *pbuf=m_tx_last.pdata;
+		uint16_t databytes=m_tx_last.dataBytes;
 		 if(m_tx_mode==SLIMSERIAL_TX_MODE_BLOCK){
 			//ret=HAL_UART_Transmit(m_huart,m_tx_queue_meta.back().pdata,m_tx_queue_meta.back().dataBytes,1000);//too slow to alter Tx_En. changed for faster Tx_En toggle
 			USART_TypeDef *uart = m_huart->Instance;
@@ -1270,8 +1288,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(){
 			ret=HAL_UART_Transmit_IT(m_huart,pbuf,databytes);
 		}
 	}
-
-	if(ret==HAL_OK || (ret==HAL_BUSY && !m_tx_queue_meta.empty())){
+	if(ret==HAL_OK || (ret==HAL_BUSY)){
 
 		return SD_USART_OK;
 	}
@@ -1396,7 +1413,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-		m_rx_status = SD_USART_ERROR;
+		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
@@ -1470,7 +1487,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes,float timeout_ms){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-		m_rx_status = SD_USART_ERROR;
+		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
@@ -1600,32 +1617,21 @@ void SlimSerial::txCpltCallback()
 	//fast toggle rx
 	toggle485Tx(false);
 
-
 	//record transfer time
 	m_tx_time_end = currentTime_us();
 	m_tx_time_cost = m_tx_time_end - m_tx_time_start;
 
 
-	//record the last tx info
-	m_tx_last= m_tx_queue_meta.back();
+	//record the tx info
 	m_totalTxBytes += m_tx_last.dataBytes;
 	m_totalTxFrames ++;
 
-	//record the max used size of the tx queue
-	m_tx_queue_max_used_size = m_tx_queue_meta.size()>m_tx_queue_max_used_size? m_tx_queue_meta.size() : m_tx_queue_max_used_size;
 
-	//dequeue the last tx info
-	m_tx_queue_meta.pop();
-
-
-
-	//trigger another tx if tx queue is not empty. Don't access back() if the queue is empty.
-	if(!m_tx_queue_meta.empty()){
-		transmitLL(); //transmit the next frame without taking the mutex, since we are already in the transmit context
+	//trigger another tx if tx queue is not empty.
+	if(pdPASS ==xQueueReceiveFromISR(m_tx_queue_meta, &m_tx_last, NULL)){
+		transmitLL(m_tx_last); //transmit the next frame without taking the mutex, since we are already in the transmit context
 	}
 	else{
-		// Give the mutex back. if no more data to transmit, we can release the mutex
-//		xSemaphoreGiveFromISR(m_txMutex,NULL);
 		m_writeLocked=false;
 	}
 
@@ -1896,6 +1902,7 @@ void SlimSerial::frameParser(){
 		}
 #if ENABLE_PROXY==1
 		else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+			m_rx_status = SD_USART_PROXY;
 			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
 			m_rx_last.dataBytes = m_parse_remainingBytes;
 			m_totalRxFrames++;
@@ -2250,28 +2257,19 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 	SD_BUF_INFO sd_buf_info;
-	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
-		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
-		LOG_INFO("Serial%d -> Serial%d, databytes = %d bytes, index= %d",m_slimSerialIndex,m_proxy_port->m_slimSerialIndex,sd_buf_info.dataBytes);
-		if(databytes==1){
-			LOG_ARRAY_BLUE(sd_buf_info.pdata,sd_buf_info.dataBytes,0);
-		}
-	}
-	else{
-		//buffer data into internal m_tx_circular_buffer
-		sd_buf_info=m_proxy_port->bufferTxData(pData,databytes);
-		LOG_INFO("Serial%d -> Serial%d, databytes = %d bytes:",m_slimSerialIndex,m_proxy_port->m_slimSerialIndex,sd_buf_info.dataBytes);
-		if(databytes==1){
-			LOG_ARRAY_GREEN(sd_buf_info.pdata,sd_buf_info.dataBytes,0);
-		}
-	}
-	//enqueue the buffered data
-	m_proxy_port->m_tx_queue_meta.push(sd_buf_info);
 
+//	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
+//		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
+//	}
+//	else{
+//		//buffer data into internal m_tx_circular_buffer
+		sd_buf_info=m_proxy_port->bufferTxData(pData,databytes);
+//	}
+	//enqueue the buffered data
+	xQueueSend(m_proxy_port->m_tx_queue_meta,(const void *)(&sd_buf_info),0);
+	
 	//enqueue and transmit
 	m_proxy_port->transmitLL_try();
-
-
 }
 
 void SlimSerial::ackProxy(){
@@ -2336,6 +2334,9 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 			disableProxy(false);//disable previous proxy without ack
 		}
 
+
+
+
 		//change settings of current serial port
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
@@ -2344,6 +2345,10 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		//change settings of  proxy serial port		
 		m_proxy_port->m_proxy_port = this;
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT;
+
+
+		//wait for current activities on proxy port to finish
+		osDelay(30);
 
 		//change baudrate of  proxy serial port	
 		if(proxy_port_baudrate == 0 || proxy_port_baudrate==1000000 || proxy_port_baudrate==115200 || proxy_port_baudrate==921600){
@@ -2360,6 +2365,9 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		}
 
 		m_proxy_port->m_enable_9bits_proxy = false;//upstream port is always 8 bits mode
+
+		//change proxy port's tx buffer to be common proxy circular buffer. This needs to be restored when disabling proxy
+		m_proxy_port->m_tx_circular_buf.init((uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,m_enable_9bits_proxy);
 
 		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
 		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
@@ -2380,6 +2388,9 @@ void SlimSerial::disableProxy(bool ackFlag){
 		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY_INTERNAL,NULL,0);
 
 		HAL_Delay(2);//wait for 2ms to let the command be sent out
+
+		//restore proxy port's tx buffer to be its original circular buffer
+		m_proxy_port->m_tx_circular_buf.init((uint8_t *)(m_proxy_port->m_tx_circular_buf_data),m_proxy_port->m_tx_circular_buf_size,m_proxy_port->m_enable_9bits_proxy);
 
 		//restore proxy port's original 9bits mode
 		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);

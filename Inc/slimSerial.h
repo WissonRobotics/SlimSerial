@@ -9,7 +9,6 @@
 #include "cmsis_os.h"
 #include <functional>
 #include <slimCircularBuffer.hpp>
-#include "static_queue.hpp"
 #include "slimSerialDefines.h"
 #include "slimSerial_Configs.h"
 
@@ -73,6 +72,8 @@ typedef enum
   SD_USART_BAD_FRAME,
   SD_USART_TIMEOUT,
   SD_USART_BUSY,
+  SD_USART_EMPTY,
+  SD_USART_PROXY,
   SD_USART_ERROR,
 } SD_USART_StatusTypeDef;
 
@@ -112,6 +113,8 @@ typedef enum
 #define SLIMSERIAL_NOTIFICATION_BIT_RESTART 0x40
 #define SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT 0x80
 
+
+#define SLIMSERIAL_TX_QUEUE_MAX_LEN 20
 
 #if ANY_TIMEOUT_TIMER_USED
 #include "tim.h"
@@ -279,7 +282,7 @@ private:
 	SD_BUF_INFO bufferTxData(uint8_t *pSrc,uint16_t datalen);
 
 	SD_USART_StatusTypeDef transmitLL_try();
-	SD_USART_StatusTypeDef transmitLL();
+	SD_USART_StatusTypeDef transmitLL(SD_BUF_INFO &txBufInfo);
 
 	SD_USART_StatusTypeDef transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
@@ -318,12 +321,17 @@ private:
 
 	//Tx circular buffer
 	SLIM_CURCULAR_BUFFER m_tx_circular_buf;
+	uint8_t *m_tx_circular_buf_data; //keep record of the pointer to the data buffer of the tx circular buffer
+	uint16_t m_tx_circular_buf_size; //size of the tx circular buffer in bytes
 
 	//rx circular buffer
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
 
 	//tx data
-	static_queue<SD_BUF_INFO, 20> m_tx_queue_meta;
+	uint8_t m_tx_queue_meta_data_buf[ SLIMSERIAL_TX_QUEUE_MAX_LEN * sizeof(SD_BUF_INFO) ];
+	StaticQueue_t m_tx_queue_meta_data;
+	QueueHandle_t m_tx_queue_meta;
+
 	SD_BUF_INFO m_tx_last;
 
 	//rx frame data
@@ -359,30 +367,27 @@ private:
     //rx ack
 	bool receivedACK;
 
-	//rx enable
-	uint8_t m_rx_mode; //0: no rx; 1:handle rx frame in task;  2:handle rx frame in interrupt.
-
 	//485 tx enable ping
 	GPIO_TypeDef* Tx_EN_Port;
 	uint16_t Tx_EN_Pin;
 
     //tx method.
-    uint8_t m_tx_mode;//0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
+    uint8_t m_tx_mode; //0: Tx_blocking;  1:Tx_DMA; 2: Tx_IT
+
+	//rx method
+	uint8_t m_rx_mode; //0: no rx; 1:handle rx frame in task
 
 	//rx frame type
 	uint8_t m_rx_frame_type;
 	uint8_t m_rx_frame_type_ori;
 
-	//synchronization tools
-	StaticSemaphore_t m_txMutexBuffer;
-	SemaphoreHandle_t m_txMutex = NULL;
-
+	//txrxc synchronization with mutex
 	StaticSemaphore_t m_txrxMutexBuffer;
 	SemaphoreHandle_t m_txrxMutex = NULL;
 	uint32_t m_txrxMutex_aquire_failed_count = 0; //how many times the txrx mutex is failed to be acquired, used to detect potential deadlock
 	uint32_t m_txrxMutex_aquire_time_us = 0; //time when the txrx mutex is acquired, used to calculate the txrx time cost
 
-
+	//tx lock
 	bool m_writeLocked = false;
 	uint32_t m_writeLock_last_true_time_us= 0; //time when the last write lock is acquired, used to timeout the write lock
 	uint32_t m_writeLock_last_reset_time_threshold_us = 200000u;
@@ -390,19 +395,13 @@ private:
 	uint32_t m_writeLock_busy_count = 0; //how many times the write lock is busy, used to detect potential deadlock
 	uint32_t m_writeLock_busy_elapsed_us = 0; //how long the write lock is busy, used to detect potential deadlock
 
-	uint8_t m_tx_queue_max_used_size = 0;
 
-	//rx task
-    bool txrxLocked = false;
-
-	//txrx task ID
+	//txrx task (external)
 	uint32_t *txrxThreadID;
 
-	//rx handling task ID
+	//rx task (internal)
 	uint32_t *rxThreadID;
 	osThreadId rxTaskHandle;
-
-	//rx task buffer
 	uint32_t rxTaskBuffer[ SLIMSERIAL_RX_TASK_BUFFER_SIZE ];
 	osStaticThreadDef_t rxTaskControlBlock;
 
