@@ -26,6 +26,12 @@ class SLIM_CURCULAR_BUFFER {
 
 public:
 	SLIM_CURCULAR_BUFFER(uint8_t *pBuf, uint16_t bufzise,uint8_t u16Mode) {
+		init(pBuf, bufzise, u16Mode);
+	}
+
+
+
+	void init(uint8_t *pBuf, uint16_t bufzise,uint8_t u16Mode){
 		if(pBuf){
 			if (!is_power_of_2(bufzise)) {
 				bufzise = shrinkTo_power_of_2(bufzise);
@@ -41,6 +47,8 @@ public:
 			bufferSize = 0;
 			mask = 0;
 		}
+		head = 0;
+		tail = 0;
 		setU16Mode(u16Mode);
 	}
 

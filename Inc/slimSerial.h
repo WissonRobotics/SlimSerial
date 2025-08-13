@@ -321,6 +321,8 @@ private:
 
 	//Tx circular buffer
 	SLIM_CURCULAR_BUFFER m_tx_circular_buf;
+	uint8_t *m_tx_circular_buf_data; //keep record of the pointer to the data buffer of the tx circular buffer
+	uint16_t m_tx_circular_buf_size; //size of the tx circular buffer in bytes
 
 	//rx circular buffer
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;

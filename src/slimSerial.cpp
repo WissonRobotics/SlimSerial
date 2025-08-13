@@ -437,6 +437,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_totalTxFrames=0;
 	m_totalRxFrames=0;
 
+	m_tx_circular_buf_data = (uint8_t *)tx_circular_buf;
+	m_tx_circular_buf_size = tx_circular_buf_size;
+
 	m_9bits_mode_original = bits_9_mode; //original 9 bits mode when the SlimSerial object is created
 
 
@@ -2254,13 +2257,14 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 	SD_BUF_INFO sd_buf_info;
-	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
-		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
-	}
-	else{
-		//buffer data into internal m_tx_circular_buffer
+
+//	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
+//		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
+//	}
+//	else{
+//		//buffer data into internal m_tx_circular_buffer
 		sd_buf_info=m_proxy_port->bufferTxData(pData,databytes);
-	}
+//	}
 	//enqueue the buffered data
 	xQueueSend(m_proxy_port->m_tx_queue_meta,(const void *)(&sd_buf_info),0);
 	
@@ -2344,7 +2348,7 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 
 
 		//wait for current activities on proxy port to finish
-		osDelay(20);
+		osDelay(30);
 
 		//change baudrate of  proxy serial port	
 		if(proxy_port_baudrate == 0 || proxy_port_baudrate==1000000 || proxy_port_baudrate==115200 || proxy_port_baudrate==921600){
@@ -2361,6 +2365,9 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		}
 
 		m_proxy_port->m_enable_9bits_proxy = false;//upstream port is always 8 bits mode
+
+		//change proxy port's tx buffer to be common proxy circular buffer. This needs to be restored when disabling proxy
+		m_proxy_port->m_tx_circular_buf.init((uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,m_enable_9bits_proxy);
 
 		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
 		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
@@ -2381,6 +2388,9 @@ void SlimSerial::disableProxy(bool ackFlag){
 		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY_INTERNAL,NULL,0);
 
 		HAL_Delay(2);//wait for 2ms to let the command be sent out
+
+		//restore proxy port's tx buffer to be its original circular buffer
+		m_proxy_port->m_tx_circular_buf.init((uint8_t *)(m_proxy_port->m_tx_circular_buf_data),m_proxy_port->m_tx_circular_buf_size,m_proxy_port->m_enable_9bits_proxy);
 
 		//restore proxy port's original 9bits mode
 		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);

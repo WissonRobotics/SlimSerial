@@ -3,6 +3,8 @@
 
 #include "slimSerialDefines.h"
 
+#define LOG_SEGGER_RTT 	 6	//htim6 is used for HAL_Tick()
+
 /****************************** User define Zone Begin***********************/
 
 #define VALVE_SERIAL     	slimSerial1
@@ -10,7 +12,7 @@
 #define SENSOR_SERIAL    	slimSerial3
 #define PC_SERIAL        	slimSerial6 // PC UI,  PC Command
 #define MOTOR_SERIAL     	slimSerial4 //
-#define ENDEFFECTOR_SERIAL  slimSerial2 //flowsensor and force/torque sensor
+#define ENDEFFECTOR_SERIAL slimSerial2 //flowsensor and force/torque sensor
 
 /****************************** SlimSerial Configuration Zone Begin***********************/
 //define which usart to use this driver
@@ -36,7 +38,6 @@
 // 0: disable rx ;  1:enable rx in task;  2:enable rx in interrupt.
 // #define SLIMSERIAL_RX_MODE_OFF   0
 // #define SLIMSERIAL_RX_MODE_DMA  1
-// #define SLIMSERIAL_RX_MODE_INT   2
 
 //SlimSerial Rx Frame Type
 // SLIMSERIAL_FRAME_TYPE_0_ANY:  	receive any rx and trigger a rx callback based on idle line dectection.
@@ -48,8 +49,8 @@
 
 //define the usart's tx rx frame max size, need to be 2^n, and the 485Tx enable pin
 #if ENABLE_SLIMSERIAL_USART1 == 1
-#define USART1_TX_FRAME_MAX_SIZE   64                      //to be 2^n,  Max bytes of Tx frame
-#define USART1_RX_FRAME_MAX_SIZE   32                      //to be 2^n,  Max bytes of Rx frame
+#define USART1_TX_FRAME_MAX_SIZE   128                      //to be 2^n,  Max bytes of Tx frame
+#define USART1_RX_FRAME_MAX_SIZE   64                      //to be 2^n,  Max bytes of Rx frame
 #define USART1_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART1_485_Tx_EN_GPIO_Port RS485_EN1_GPIO_Port     //NULL if not used
 #define USART1_485_Tx_EN_GPIO_Pin  RS485_EN1_Pin           //NULL if not used
@@ -73,7 +74,7 @@
 
 #if ENABLE_SLIMSERIAL_USART3 == 1
 #define USART3_TX_FRAME_MAX_SIZE   64                      //to be 2^n,  Max bytes of Tx frame
-#define USART3_RX_FRAME_MAX_SIZE   64                      //to be 2^n,  Max bytes of Rx frame
+#define USART3_RX_FRAME_MAX_SIZE   128                      //to be 2^n,  Max bytes of Rx frame
 #define USART3_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART3_485_Tx_EN_GPIO_Port RS485_EN3_GPIO_Port                    //set to NULL if not used
 #define USART3_485_Tx_EN_GPIO_Pin  RS485_EN3_Pin                       //set to NULL if not used
@@ -98,7 +99,7 @@
 #if ENABLE_SLIMSERIAL_USART5 == 1
 #define USART5_TX_FRAME_MAX_SIZE   1024                     //to be 2^n,  Max bytes of Tx frame
 #define USART5_RX_FRAME_MAX_SIZE   2048                      //to be 2^n,  Max bytes of Rx frame
-#define USART5_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
+#define USART5_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_0_ANY //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART5_485_Tx_EN_GPIO_Port NULL                    //set to NULL if not used
 #define USART5_485_Tx_EN_GPIO_Pin  0                       //set to NULL if not used
 #define USART5_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
@@ -108,7 +109,7 @@
 #endif
 
 #if ENABLE_SLIMSERIAL_USART6 == 1
-#define USART6_TX_FRAME_MAX_SIZE   256                     //to be 2^n,  Max bytes of Tx frame
+#define USART6_TX_FRAME_MAX_SIZE   1024                     //to be 2^n,  Max bytes of Tx frame
 #define USART6_RX_FRAME_MAX_SIZE   2048                     //to be 2^n,  Max bytes of Rx frame
 #define USART6_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
 #define USART6_485_Tx_EN_GPIO_Port RS485_EN6_GPIO_Port     //set to NULL if not used
@@ -150,13 +151,12 @@
 #if defined(__STM32F0xx_HAL_H)
 #define SLIMSERIAL_HAL_TICK_TIMER_INDEX 	 6	//htim6 is used for HAL_Tick()
 #define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
-#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       128    // rx task stack size
+#define SLIMSERIAL_RX_TASK_BUFFER_SIZE       200    // rx task stack size
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
 #define SLIMSERIAL_HEADER_FILTER_MAX_LEN     2
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    2
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    2
 #define ENABLE_PROXY                         0      //0:disable proxy mode 1:enable proxy mode
-#define SLIMSERIAL_PROXY_BUFFER_SIZE				 	 1200   //proxy buffer size, should be larger than 1029 to hold a YModem frame. wont be used if ENABLE_PROXY is 0
 //advanced config for F4
 #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
 #define SLIMSERIAL_HAL_TICK_TIMER_INDEX		 6		//htim6 is used for HAL_Tick()
@@ -167,7 +167,6 @@
 #define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
 #define ENABLE_PROXY                         1    //0:disable proxy mode 1:enable proxy mode
-#define SLIMSERIAL_PROXY_BUFFER_SIZE				 	 1200 //proxy buffer size, should be larger than 1029 to hold a YModem frame. wont be used if ENABLE_PROXY is 0
 #endif
 
 
