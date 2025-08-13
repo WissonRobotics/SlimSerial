@@ -9,7 +9,6 @@
 #include "cmsis_os.h"
 #include <functional>
 #include <slimCircularBuffer.hpp>
-#include "static_queue.hpp"
 #include "slimSerialDefines.h"
 #include "slimSerial_Configs.h"
 
