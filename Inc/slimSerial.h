@@ -73,6 +73,7 @@ typedef enum
   SD_USART_TIMEOUT,
   SD_USART_BUSY,
   SD_USART_EMPTY,
+  SD_USART_PROXY,
   SD_USART_ERROR,
 } SD_USART_StatusTypeDef;
 

@@ -1410,7 +1410,7 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-		m_rx_status = SD_USART_ERROR;
+		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
@@ -1484,7 +1484,7 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes,float timeout_ms){
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
-		m_rx_status = SD_USART_ERROR;
+		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
 		return  m_rx_last;
 	}
@@ -1899,6 +1899,7 @@ void SlimSerial::frameParser(){
 		}
 #if ENABLE_PROXY==1
 		else if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
+			m_rx_status = SD_USART_PROXY;
 			m_rx_circular_buf.out(m_rx_last.pdata, m_parse_remainingBytes);
 			m_rx_last.dataBytes = m_parse_remainingBytes;
 			m_totalRxFrames++;
@@ -2329,6 +2330,9 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 			disableProxy(false);//disable previous proxy without ack
 		}
 
+
+
+
 		//change settings of current serial port
 		m_proxy_port = proxy_port_;
 		m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT; 
@@ -2337,6 +2341,10 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		//change settings of  proxy serial port		
 		m_proxy_port->m_proxy_port = this;
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_TRANSPARENT;
+
+
+		//wait for current activities on proxy port to finish
+		osDelay(20);
 
 		//change baudrate of  proxy serial port	
 		if(proxy_port_baudrate == 0 || proxy_port_baudrate==1000000 || proxy_port_baudrate==115200 || proxy_port_baudrate==921600){
