@@ -853,26 +853,30 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
 //only support 4bit address
 SD_USART_StatusTypeDef SlimSerial::config9bitRxAddress(uint8_t rx_address){
 
+	if(m_9bits_mode==1){
+		//
+		m_9bits_mode_address_rx = rx_address & 0x0F; 			//mask to 4 bits
 
-	//
-	m_9bits_mode_address_rx = rx_address & 0x0F; 			//mask to 4 bits
+		if (HAL_MultiProcessor_Init(m_huart,m_9bits_mode_address_rx,UART_WAKEUPMETHOD_ADDRESSMARK) != HAL_OK)
+		{
+			//error handling
+			m_9bits_mode_error = 1;
+			Error_Handler();
+		}
 
-	if (HAL_MultiProcessor_Init(m_huart,m_9bits_mode_address_rx,UART_WAKEUPMETHOD_ADDRESSMARK) != HAL_OK)
-	{
-		//error handling
-		m_9bits_mode_error = 1;
-		Error_Handler();
+		m_9bits_mode_error = 0;
+	#if defined(__STM32F0xx_HAL_H)
+		HAL_MultiProcessor_EnableMuteMode(m_huart);
+	#endif
+		HAL_MultiProcessor_EnterMuteMode(m_huart);
+
+		m_enable_rx_wake_up = true;
+
+		return SD_USART_OK;
 	}
-
-	m_9bits_mode_error = 0;
-#if defined(__STM32F0xx_HAL_H)
-	HAL_MultiProcessor_EnableMuteMode(m_huart);
-#endif
-	HAL_MultiProcessor_EnterMuteMode(m_huart);
-
-	m_enable_rx_wake_up = true;
-
-	return SD_USART_OK;
+	else{
+		return SD_USART_ERROR;
+	}
 
 }
 
@@ -1021,6 +1025,11 @@ void SlimSerial::addAddressFilter(uint8_t address){
 		 addressFilter_num++;
 	 }
 	 m_address = address; //set the address to be the last added address
+
+	 if(m_9bits_mode==1){
+		 config9bitRxAddress(address); //set the 9bit address
+		 config9bitTxAddress(address); //set the 9bit address
+	 }
 
 	 toggleAddressFilter(true);
 
