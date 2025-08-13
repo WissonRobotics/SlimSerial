@@ -41,14 +41,14 @@ public:
 			bufferSize = 0;
 			mask = 0;
 		}
-		setU16Mdoe(u16Mode);
+		setU16Mode(u16Mode);
 	}
 
 	/**
 	 * @brief set the buffer to use uint16_t mode
 	 * in this mode, the buffer will be treated as an array of uint16_t
 	 */
-	void setU16Mdoe(uint8_t u16Mode){
+	void setU16Mode(uint8_t u16Mode){
 		m_U16_mode = u16Mode;
 	}
 
