@@ -234,6 +234,8 @@ public:
 	void txrxTimeoutCallback();
 	void restartRxFromISR();
 
+	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
+
 	//proxy
 	SLIMSERIAL_PROXY_MODE getProxyMode();
 	SLIMSERIAL_PROXY_MODE m_proxy_mode;
@@ -272,7 +274,7 @@ private:
 
 	void configRxDMACircularMode();
 
-	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
+
 
 
 	SD_BUF_INFO bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc);
