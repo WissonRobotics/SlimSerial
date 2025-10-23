@@ -15,10 +15,10 @@
 #define INTERNAL_MAX_FRAME_SIZE 2048
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL 128
 
-#define SLIMSERIAL_TX_QUEUE_MAX_LEN 20
+#define SLIMSERIAL_TX_QUEUE_MAX_LEN 10
 #define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 3
-#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
-#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
+#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     3
+#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    3
 #define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
 
 
@@ -177,8 +177,10 @@ public:
 
 	SD_BUF_INFO &transmitReceiveData(uint8_t *pdata,uint16_t dataBytes,float timeout,bool frameTypeFilterOn=true);
 
+#if SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED==1
 	SD_BUF_INFO &modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS=20);
 	SD_BUF_INFO &modbusWrite(uint8_t des, uint16_t reg_address,uint16_t reg_data,uint16_t timeoutMS=20);
+#endif
 
 	uint32_t readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout);
 
@@ -300,6 +302,8 @@ private:
     bool applyHeaderFilter(uint8_t h1In,uint8_t h2In);
     bool applyAddressFilter(uint8_t addressIn);
     bool applyFuncodeFilter(uint8_t funcode);
+
+    void clearFlags();
 
 	std::array<std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)>, SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN> m_frameCallbackFuncArray;
 	void (*m_frameCallbackFuncArray_C[SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN])(SlimSerial *,uint8_t *,uint16_t );

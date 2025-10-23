@@ -617,7 +617,7 @@ void SlimSerial::configTimeoutTimer(){
 	}
 
 	RCC_ClkInitTypeDef    clkconfig;
-	uint32_t              uwTimclock;
+	uint32_t              uwTimclock=HAL_RCC_GetPCLK1Freq();
 	uint32_t              pFLatency;
 
 	/* Get clock configuration */
@@ -712,6 +712,12 @@ SD_USART_StatusTypeDef SlimSerial::reconfigure(uint8_t enable_9bits_mode){
 
 
 	HAL_UART_Abort(m_huart);
+
+	HAL_UART_MspDeInit(m_huart); //deinit the uart msp first
+
+	HAL_UART_MspInit(m_huart); //deinit the uart msp first
+
+	clearFlags();
 
  	//check 9bit mode bit is set
 	m_9bits_mode = enable_9bits_mode;
@@ -1591,6 +1597,8 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 		HAL_DMA_Abort(m_huart->hdmarx);
 	}
 	HAL_UART_AbortReceive(m_huart);
+
+	clearFlags();
 	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.buffer, m_rx_circular_buf.bufferSize) != HAL_OK)
 	{
 		m_huart->hdmarx->State=HAL_DMA_STATE_BUSY;//to make sure the next HAL_DMA_Abort
@@ -1610,6 +1618,7 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 }
 
 
+#if SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED==1
 SD_BUF_INFO &SlimSerial::modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS){
 	std::array<uint8_t,8> readFrame={des,0x03,(uint8_t)(reg_address>>8),(uint8_t)(reg_address&0xFF),(uint8_t)(reg_count>>8),(uint8_t)(reg_count&0xFF),0,0};
 	uint16_t crc = SD_CRC_Calculate(&readFrame[0], 6);
@@ -1628,7 +1637,7 @@ SD_BUF_INFO &SlimSerial::modbusWrite(uint8_t des, uint16_t reg_address,uint16_t 
 	return transmitReceiveData(&writeFrame[0],sizeof(writeFrame),timeoutMS);
 }
 
-
+#endif
 
 void SlimSerial::txCpltCallback()
 {
@@ -1682,9 +1691,7 @@ void SlimSerial::errorCallback()
 {
 	//normally this is all about rx error.
 	//clear rx error flag
-	__HAL_UART_CLEAR_PEFLAG(m_huart);
-	  __HAL_UART_CLEAR_FEFLAG(m_huart);
-	  __HAL_UART_CLEAR_OREFLAG(m_huart);
+	clearFlags();
 	restartRxFromISR();
 }
 
@@ -1735,7 +1742,8 @@ void SlimSerial::rxHandlerThread() {
 		ulTaskNotifyValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
 		if(ulTaskNotifyValue & SLIMSERIAL_NOTIFICATION_BIT_RESTART) {
-			start_Rx_DMA_Idle_Circular();
+			reconfigure(m_9bits_mode_original);
+//			start_Rx_DMA_Idle_Circular();
 			continue;
 		}
 
@@ -2247,7 +2255,20 @@ void SlimSerial::frameParser(){
 }
 
 
-
+void SlimSerial::clearFlags(){
+//	  *            @arg @ref UART_CLEAR_PEF      Parity Error Clear Flag
+//	  *            @arg @ref UART_CLEAR_FEF      Framing Error Clear Flag
+//	  *            @arg @ref UART_CLEAR_NEF      Noise detected Clear Flag
+//	  *            @arg @ref UART_CLEAR_OREF     Overrun Error Clear Flag
+//	  *            @arg @ref UART_CLEAR_IDLEF    IDLE line detected Clear Flag
+//	  *            @arg @ref UART_CLEAR_TCF      Transmission Complete Clear Flag
+//	  *            @arg @ref UART_CLEAR_RTOF     Receiver Timeout clear flag
+//	  *            @arg @ref UART_CLEAR_LBDF     LIN Break Detection Clear Flag
+//	  *            @arg @ref UART_CLEAR_CTSF     CTS Interrupt Clear Flag
+//	  *            @arg @ref UART_CLEAR_CMF      Character Match Clear Flag
+  	__HAL_UART_CLEAR_FLAG(m_huart,UART_CLEAR_PEF|UART_CLEAR_FEF|UART_CLEAR_NEF|UART_CLEAR_OREF|UART_CLEAR_IDLEF|
+  							UART_CLEAR_TCF);
+}
 
 uint32_t SlimSerial::getRxIdleTimeUs(){
 	return currentTime_us()- m_rx_time_end;
@@ -2750,9 +2771,8 @@ void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
 
 	if ((errorflags != RESET) && ((cr3its & USART_CR3_EIE) == RESET)){
 	  /* If error interrupt is not enabled, clear the error flags */
-	  __HAL_UART_CLEAR_PEFLAG(huart);
-	  __HAL_UART_CLEAR_FEFLAG(huart);
-	  __HAL_UART_CLEAR_OREFLAG(huart);
+	  	__HAL_UART_CLEAR_FLAG(huart,UART_CLEAR_PEF|UART_CLEAR_FEF|UART_CLEAR_NEF|UART_CLEAR_OREF|UART_CLEAR_IDLEF|
+	  							UART_CLEAR_TCF);
 	}
 }
 }
