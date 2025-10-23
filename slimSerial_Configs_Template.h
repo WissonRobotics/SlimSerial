@@ -1,5 +1,4 @@
-#ifndef SLIMSERIAL_CONFIGS_H_
-#define SLIMSERIAL_CONFIGS_H_
+#pragma once
 
 #include "slimSerialDefines.h"
 
@@ -80,8 +79,8 @@
 #define USART3_485_Tx_EN_GPIO_Pin  RS485_EN3_Pin                       //set to NULL if not used
 #define USART3_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART3_RX_MODE             SLIMSERIAL_RX_MODE_DMA                       // 0: disable rx ;  1:enable rx;
-#define USART3_9_BITS_MODE         1                       // 0: 8 bits mode; 1: 9 bits mode
-#define USART3_TIMEOUT_TIMER_INDEX 14 				   // The timer used for more accurate txrx timeout. set to 0 if not used
+#define USART3_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
+#define USART3_TIMEOUT_TIMER_INDEX 0 				   // The timer used for more accurate txrx timeout. set to 0 if not used
 #endif
 
 #if ENABLE_SLIMSERIAL_USART4 == 1
@@ -112,8 +111,8 @@
 #define USART6_TX_FRAME_MAX_SIZE   1024                     //to be 2^n,  Max bytes of Tx frame
 #define USART6_RX_FRAME_MAX_SIZE   2048                     //to be 2^n,  Max bytes of Rx frame
 #define USART6_FRAME_TYPE          SLIMSERIAL_FRAME_TYPE_1 //0: any rx  1:5+N+2  2:4+N+2   3:MODBUS
-#define USART6_485_Tx_EN_GPIO_Port RS485_EN6_GPIO_Port     //set to NULL if not used
-#define USART6_485_Tx_EN_GPIO_Pin  RS485_EN6_Pin           //set to NULL if not used
+#define USART6_485_Tx_EN_GPIO_Port NULL     //set to NULL if not used
+#define USART6_485_Tx_EN_GPIO_Pin  0           //set to NULL if not used
 #define USART6_TX_MODE             SLIMSERIAL_TX_MODE_DMA  // 0: Tx_blocking;	1:Tx_DMA; 		2: Tx_IT
 #define USART6_RX_MODE             SLIMSERIAL_RX_MODE_DMA                       // 0: disable rx ;  1:enable rx;
 #define USART6_9_BITS_MODE         0                       // 0: 8 bits mode; 1: 9 bits mode
@@ -150,24 +149,13 @@
 //advanced config for F0
 #if defined(__STM32F0xx_HAL_H)
 #define SLIMSERIAL_HAL_TICK_TIMER_INDEX 	 6	//htim6 is used for HAL_Tick()
-#define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     2      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       200    // rx task stack size
-#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 2      //number of callbacks that can attach to one serial
-#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     2
-#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    2
-#define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    2
 #define ENABLE_PROXY                         0      //0:disable proxy mode 1:enable proxy mode
+#define USE_RTT_LOG					 		 0      //0:disable RTT log 1:enable RTT log
 //advanced config for F4
-#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
+#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H) || defined(STM32H743xx)
 #define SLIMSERIAL_HAL_TICK_TIMER_INDEX		 6		//htim6 is used for HAL_Tick()
-#define SLIMSERIAL_DEFAULT_TX_QUEUE_SIZE     3      //default tx queue size
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE       1024   // rx task stack size
-#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 5      //number of callbacks that can attach to one serial
-#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
-#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
-#define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
 #define ENABLE_PROXY                         1    //0:disable proxy mode 1:enable proxy mode
+#define USE_RTT_LOG					 		 0      //0:disable RTT log 1:enable RTT log
 #endif
-
-
-#endif /* SLIMSERIAL_CONFIGS_H_ */

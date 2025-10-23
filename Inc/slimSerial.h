@@ -1,12 +1,12 @@
-#ifndef SLIM_SERIAL_H_
-#define SLIM_SERIAL_H_
 #pragma once
 #include <main.h>
+#include "cmsis_os.h"
 #include "stdio.h"
 #include "usart.h"
 
 #include "math.h"
-#include "cmsis_os.h"
+
+#include <array>
 #include <functional>
 #include <slimCircularBuffer.hpp>
 #include "slimSerialDefines.h"
@@ -14,6 +14,13 @@
 
 #define INTERNAL_MAX_FRAME_SIZE 2048
 #define SLIMSERIAL_RX_TASK_BUFFER_SIZE_MINIMAL 128
+
+#define SLIMSERIAL_TX_QUEUE_MAX_LEN 20
+#define SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN 3
+#define SLIMSERIAL_HEADER_FILTER_MAX_LEN     5
+#define SLIMSERIAL_ADDRESS_FILTER_MAX_LEN    5
+#define SLIMSERIAL_FUNCODE_FILTER_MAX_LEN    3
+
 
 typedef struct SLIMSERIAL_FRAME_TYPE_0_TAG {
 	union {
@@ -114,7 +121,7 @@ typedef enum
 #define SLIMSERIAL_NOTIFICATION_BIT_TIMEOUT 0x80
 
 
-#define SLIMSERIAL_TX_QUEUE_MAX_LEN 20
+
 
 #if ANY_TIMEOUT_TIMER_USED
 #include "tim.h"
@@ -199,7 +206,7 @@ public:
 
 	//usart
 	UART_HandleTypeDef *m_huart;
-	uint8_t m_slimSerialIndex; //index of the SlimSerial object, used to identify the SlimSerial object in the system
+	uint8_t m_port_index; //index of the SlimSerial object, used to identify the SlimSerial object in the system
 
 	//timeout timer
 	TIM_HandleTypeDef *m_timeout_htim;
@@ -234,7 +241,7 @@ public:
 	void txrxTimeoutCallback();
 	void restartRxFromISR();
 
-	SD_USART_StatusTypeDef config9bitMode(uint8_t enable_9bits_mode);
+	SD_USART_StatusTypeDef reconfigure(uint8_t enable_9bits_mode);
 
 	//proxy
 	SLIMSERIAL_PROXY_MODE getProxyMode();
@@ -442,6 +449,3 @@ extern SlimSerial slimSerial7;
 #if ENABLE_SLIMSERIAL_USART8
 extern SlimSerial slimSerial8;
 #endif
-
-
-#endif /* SLIM_SERIAL_H_ */

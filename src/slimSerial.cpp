@@ -1,10 +1,13 @@
-
-#include <slimSerial.h>
-#include "stdio.h"
 #include "cmsis_os.h"
+#include "stdio.h"
+#include <slimSerial.h>
+
+
 //#include <type_traits>
 //#include <format>
-//#include "RTT_LOG.h"
+#if USE_RTT_LOG==1      //0:disable RTT log 1:enable RTT log
+#include "RTT_LOG.h"
+#endif
 
 #if ENABLE_SLIMSERIAL_USART1==1
 #define USART1_TX_CIRCULAR_BUFFER_SIZE USART1_TX_FRAME_MAX_SIZE*2
@@ -386,7 +389,7 @@ SlimSerial slimSerial8(&huart8,
 #if ENABLE_PROXY==1
 #define  SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE 2048
 uint16_t SLIMSERIAL_PROXY_CIRCULAR_BUFFER[SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE]; //capable of holding maximum YModem frame size of 1029 even in 9 bits mode
-SLIM_CURCULAR_BUFFER SlimSerial::m_proxy_circular_buffer={(uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,0};
+//SLIM_CURCULAR_BUFFER SlimSerial::m_proxy_circular_buffer={(uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,0};
 #endif
 
 static uint8_t getSlimSerialIndex(UART_HandleTypeDef *huart);
@@ -412,7 +415,7 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
  {
 
 	m_huart = uartHandle;
-	m_slimSerialIndex = getSlimSerialIndex(m_huart);
+	m_port_index = getSlimSerialIndex(m_huart);
 
 
 
@@ -626,7 +629,7 @@ void SlimSerial::configTimeoutTimer(){
 #elif defined(__STM32F1xx_HAL_H)
 	//TODO: add F1 support
 
-#elif defined(__STM32F4xx_HAL_H)
+#elif defined(__STM32F4xx_HAL_H) || defined(STM32H743xx)
 	//APB1 for TIM2, TIM3, TIM4, TIM5,TIM6,TIM7, TIM12, TIM13, TIM14
 	if((m_timeout_htim_index>=2 && m_timeout_htim_index<=7) || (m_timeout_htim_index>=12 && m_timeout_htim_index<=14)){
 #endif
@@ -640,7 +643,7 @@ void SlimSerial::configTimeoutTimer(){
 		}
 	}
 	else{//APB2 for TIM1, TIM8, TIM9, TIM10, TIM11
-#if defined(__STM32F4xx_HAL_H)
+#if defined(__STM32F4xx_HAL_H) || defined(STM32H743xx)
 		if (clkconfig.APB2CLKDivider == RCC_HCLK_DIV1)
 		{
 			uwTimclock = HAL_RCC_GetPCLK2Freq();
@@ -691,21 +694,24 @@ void SlimSerial::stopTimeout(){
 
 #endif //ANY_TIMEOUT_TIMER_USED
 
-void SlimSerial::configRxDMACircularMode() {
-	//if rx is enabled, ensure a rx DMA circular mode is set
-	if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
-		if(m_huart->hdmarx->Init.Mode != DMA_CIRCULAR){
-			m_huart->hdmarx->Init.Mode = DMA_CIRCULAR;
-			if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
-			{
-				//error handling
-				Error_Handler();
-			}
-		}
-	}
-}
+//void SlimSerial::configRxDMACircularMode() {
+//	//if rx is enabled, ensure a rx DMA circular mode is set
+//	if(m_rx_mode==SLIMSERIAL_RX_MODE_DMA){
+//		if(m_huart->hdmarx->Init.Mode != DMA_CIRCULAR){
+//			m_huart->hdmarx->Init.Mode = DMA_CIRCULAR;
+//			if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
+//			{
+//				//error handling
+//				Error_Handler();
+//			}
+//		}
+//	}
+//}
 
-SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
+SD_USART_StatusTypeDef SlimSerial::reconfigure(uint8_t enable_9bits_mode){
+
+
+	HAL_UART_Abort(m_huart);
 
  	//check 9bit mode bit is set
 	m_9bits_mode = enable_9bits_mode;
@@ -718,131 +724,59 @@ SD_USART_StatusTypeDef SlimSerial::config9bitMode(uint8_t enable_9bits_mode){
 	m_tx_circular_buf.clear(); //clear the circular buffer first
 	m_tx_circular_buf.setU16Mode(m_9bits_mode);
 
-	//set proxy circular buffer 9bits mode
-	#if ENABLE_PROXY==1
-	m_proxy_circular_buffer.clear(); //clear the circular buffer first
-	m_proxy_circular_buffer.setU16Mode(m_9bits_mode);
-	#endif
+//	//set proxy circular buffer 9bits mode
+//	#if ENABLE_PROXY==1
+//	m_proxy_circular_buffer.clear(); //clear the circular buffer first
+//	m_proxy_circular_buffer.setU16Mode(m_9bits_mode);
+//	#endif
 
 	xQueueReset(m_tx_queue_meta); //clear the tx queue meta data
 
- 	if(enable_9bits_mode==1){
+	//only configure to 9 bits mode if original mode is also 9 bits mode enabled
 
- 			//otherwise, set to 9bit mode
- 			m_huart->Init.WordLength = UART_WORDLENGTH_9B;
- 			if (HAL_UART_Init(m_huart) != HAL_OK)
- 			{
- 				//error handling
- 				m_9bits_mode_error = 1;
- 				return SD_USART_ERROR;
- 			}
-
-
- 		//check tx DMA to be 16bit
- 		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
-// 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
-// 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
-// 			   ){
-				if(m_huart->hdmatx->State==HAL_DMA_STATE_BUSY){
-					HAL_DMA_Abort(m_huart->hdmatx);
-				}
-				HAL_UART_AbortTransmit(m_huart);
-
- 				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
- 				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+	m_huart->Init.WordLength = (m_9bits_mode && m_9bits_mode_original) ? UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
+	if(m_9bits_mode && m_9bits_mode_original && m_enable_rx_wake_up){
+		if(config9bitRxAddress(m_9bits_mode_address_rx)!=SD_USART_OK){
+			//error handling
+			m_9bits_mode_error = 1;
+			return SD_USART_ERROR;
+		}
+	}
+	else{
+		if(HAL_UART_Init(m_huart)!=HAL_OK){
+			//error handling
+			m_9bits_mode_error = 1;
+			return SD_USART_ERROR;
+		}
+	}
 
 
- 				if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
- 				{
- 					//error handling
- 					m_9bits_mode_error = 1;
- 					return SD_USART_ERROR;
- 				}
+	//change tx DMA to 16bit
+	if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
+		m_huart->hdmatx->Init.MemDataAlignment = (m_9bits_mode && m_9bits_mode_original) ? DMA_MDATAALIGN_HALFWORD : DMA_MDATAALIGN_BYTE;
+		m_huart->hdmatx->Init.PeriphDataAlignment = (m_9bits_mode && m_9bits_mode_original) ? DMA_PDATAALIGN_HALFWORD : DMA_PDATAALIGN_BYTE;
+		if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
+		{
+			//error handling
+			m_9bits_mode_error = 1;
+			return SD_USART_ERROR;
+		}
 
-// 			}
- 		}
+	}
 
+	//change rx DMA to 16bit
+	if(m_rx_mode==SLIMSERIAL_RX_MODE_DMA){
 
- 		//check rx DMA to be 16bit
- 		//if rx is enabled, it must use DMA
- 		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
-// 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD ||
-// 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_HALFWORD
-// 			   ){
-				if(m_huart->hdmarx->State==HAL_DMA_STATE_BUSY){
-					HAL_DMA_Abort(m_huart->hdmarx);
-				}
-				HAL_UART_AbortReceive(m_huart);
- 				//otherwise, set to 16bit mode
- 				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
- 				m_huart->hdmarx->Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+		m_huart->hdmarx->Init.MemDataAlignment = (m_9bits_mode && m_9bits_mode_original) ? DMA_MDATAALIGN_HALFWORD : DMA_MDATAALIGN_BYTE;
+		m_huart->hdmarx->Init.PeriphDataAlignment = (m_9bits_mode && m_9bits_mode_original) ? DMA_PDATAALIGN_HALFWORD : DMA_PDATAALIGN_BYTE;
+		m_huart->hdmarx->Init.Mode = DMA_CIRCULAR;
 
-
- 				if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
- 				{
- 					//error handling
- 					m_9bits_mode_error = 1;
- 					return SD_USART_ERROR;
- 				}
-// 			}
- 		}
- 	}
- 	else{
-// 		if(m_huart->Init.WordLength != UART_WORDLENGTH_8B){
-
-			//otherwise, set to 9bit mode
-			m_huart->Init.WordLength = UART_WORDLENGTH_8B;
-			if (HAL_UART_Init(m_huart) != HAL_OK)
-			{
-				//error handling
-				m_9bits_mode_error = 1;
-				return SD_USART_ERROR;
-			}
-//		}
-
- 		//check tx DMA to be 8bit
- 		if(m_tx_mode==SLIMSERIAL_TX_MODE_DMA){
-// 			if(m_huart->hdmatx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
-// 			   m_huart->hdmatx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
-// 			   ){
-				if(m_huart->hdmatx->State==HAL_DMA_STATE_BUSY){
-					HAL_DMA_Abort(m_huart->hdmatx);
-				}
-				HAL_UART_AbortTransmit(m_huart);
-
- 				m_huart->hdmatx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
- 				m_huart->hdmatx->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
- 				if (HAL_DMA_Init(m_huart->hdmatx) != HAL_OK)
- 				{
- 					//error handling
- 					m_9bits_mode_error = 1;
- 					return SD_USART_ERROR;
- 				}
-// 			}
- 		}
-
- 		//check rx DMA to be 8bit
- 		//if rx is enabled, it must use DMA
- 		if(m_rx_mode!=SLIMSERIAL_RX_MODE_OFF){
-// 			if(m_huart->hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_BYTE ||
-// 			   m_huart->hdmarx->Init.PeriphDataAlignment != DMA_PDATAALIGN_BYTE
-// 			   ){
-				if(m_huart->hdmarx->State==HAL_DMA_STATE_BUSY){
-					HAL_DMA_Abort(m_huart->hdmarx);
-				}
-				HAL_UART_AbortReceive(m_huart);
- 				//otherwise, set to 8bit mode
- 				m_huart->hdmarx->Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
- 				m_huart->hdmarx->Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-
- 				if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
- 				{
- 					//error handling
- 					m_9bits_mode_error = 1;
- 					return SD_USART_ERROR;
- 				}
-// 			}
- 		}
+		if (HAL_DMA_Init(m_huart->hdmarx) != HAL_OK)
+		{
+			//error handling
+			m_9bits_mode_error = 1;
+			return SD_USART_ERROR;
+		}
  	}
 
  	start_Rx_DMA_Idle_Circular(); //restart the rx DMA in idle circular mode
@@ -865,7 +799,7 @@ SD_USART_StatusTypeDef SlimSerial::config9bitRxAddress(uint8_t rx_address){
 		}
 
 		m_9bits_mode_error = 0;
-	#if defined(__STM32F0xx_HAL_H)
+	#if defined(__STM32F0xx_HAL_H) || defined(STM32H743xx)
 		HAL_MultiProcessor_EnableMuteMode(m_huart);
 	#endif
 		HAL_MultiProcessor_EnterMuteMode(m_huart);
@@ -1200,6 +1134,81 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
 			//get the last tx buffer info from the queue
 			m_writeLocked=true;
 			m_writeLock_last_true_time_us = currentTime_us();
+#if USE_RTT_LOG==1
+			if(!m_9bits_mode){
+				switch (m_tx_last.dataBytes){
+					case 1:{
+
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0]);
+						break;
+						}
+					case 2:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1]);
+						break;
+						}
+					case 3:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1],m_tx_last.pdata[2]);
+						break;
+					}
+					case 4:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1],m_tx_last.pdata[2],m_tx_last.pdata[3]);
+						break;
+					}
+					case 5:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1],m_tx_last.pdata[2],m_tx_last.pdata[3],m_tx_last.pdata[4]);
+						break;
+					}
+					case 6:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1],m_tx_last.pdata[2],m_tx_last.pdata[3],m_tx_last.pdata[4],m_tx_last.pdata[5]);
+						break;
+					}
+					case 7:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, content=%x %x %x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[0],m_tx_last.pdata[1],m_tx_last.pdata[2],m_tx_last.pdata[3],m_tx_last.pdata[4],m_tx_last.pdata[5],m_tx_last.pdata[6]);
+						break;
+					}
+					default:{
+						LOG_INFO("Port %d transmit           : dataBytes=%d, last=%x\r\n",m_port_index,m_tx_last.dataBytes,m_tx_last.pdata[m_tx_last.dataBytes-1]);//buf2HexString(m_tx_last.pdata,m_tx_last.dataBytes).c_str());
+					}
+				}
+			}
+			else{
+
+				uint16_t *pbuf=(uint16_t*)(m_tx_last.pdata);
+				switch (m_tx_last.dataBytes){
+					case 1:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1]);
+						break;
+						}
+					case 2:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2]);
+						break;
+					}
+					case 3:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2],pbuf[3]);
+						break;
+					}
+					case 4:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2],pbuf[3],pbuf[4]);
+						break;
+					}
+					case 5:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2],pbuf[3],pbuf[4],pbuf[5]);
+						break;
+					}
+					case 6:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2],pbuf[3],pbuf[4],pbuf[5],pbuf[6]);
+						break;
+					}
+					case 7:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, content=%x %x %x %x %x %x %x %x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[0],pbuf[1],pbuf[2],pbuf[3],pbuf[4],pbuf[5],pbuf[6],pbuf[7]);
+						break;
+					}
+					default:{
+						LOG_INFO("Port %d transmit      9bit : dataBytes=%d, last=%x\r\n",m_port_index,m_tx_last.dataBytes,pbuf[m_tx_last.dataBytes]);//buf2HexString(m_tx_last.pdata,m_tx_last.dataBytes).c_str());
+					}
+				}
+			}
+#endif
 			return transmitLL(m_tx_last);
 		}
 		else{
@@ -1246,7 +1255,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(SD_BUF_INFO &txBufInfo){
 		 if(m_tx_mode==SLIMSERIAL_TX_MODE_BLOCK){
 			USART_TypeDef *uart = m_huart->Instance;
 			while(databytes-->0){
-	#if defined(__STM32F0xx_HAL_H)
+	#if defined(__STM32F0xx_HAL_H)|| defined(STM32H743xx)
 				uart->TDR =  *pbuf;
 	#elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
 				uart->DR =  *pbuf;
@@ -1275,7 +1284,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(SD_BUF_INFO &txBufInfo){
 			USART_TypeDef *uart = m_huart->Instance;
 
 			while(databytes-->0){
- #if defined(__STM32F0xx_HAL_H)
+ #if defined(__STM32F0xx_HAL_H) || defined(STM32H743xx)
 				uart->TDR =  *pbuf;
  #elif defined(__STM32F4xx_HAL_H) || defined(__STM32F1xx_HAL_H)
 				uart->DR =  *pbuf;
@@ -1635,7 +1644,6 @@ void SlimSerial::txCpltCallback()
 	m_totalTxBytes += m_tx_last.dataBytes;
 	m_totalTxFrames ++;
 
-
 	//trigger another tx if tx queue is not empty.
 	if(pdPASS ==xQueueReceiveFromISR(m_tx_queue_meta, &m_tx_last, NULL)){
 		transmitLL(m_tx_last); //transmit the next frame without taking the mutex, since we are already in the transmit context
@@ -1675,7 +1683,8 @@ void SlimSerial::errorCallback()
 	//normally this is all about rx error.
 	//clear rx error flag
 	__HAL_UART_CLEAR_PEFLAG(m_huart);
-
+	  __HAL_UART_CLEAR_FEFLAG(m_huart);
+	  __HAL_UART_CLEAR_OREFLAG(m_huart);
 	restartRxFromISR();
 }
 
@@ -1710,15 +1719,13 @@ void SlimSerial::rxHandlerThread() {
 	 /*get ready for receive*/
 	rxThreadID = (uint32_t *)osThreadGetId();
 
-	configRxDMACircularMode();
-
 #if ANY_TIMEOUT_TIMER_USED
 	configTimeoutTimer();
 #endif
 
 	osDelay(20);
 
-	config9bitMode(m_9bits_mode_original);
+	reconfigure(m_9bits_mode_original);
 //	start_Rx_DMA_Idle_Circular();//already called in config9bitMode()
 
 	/* Infinite loop */
@@ -2264,7 +2271,7 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 }
 #if ENABLE_PROXY==1
 
-void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
+void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t dataBytes){
 	SD_BUF_INFO sd_buf_info;
 
 //	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
@@ -2272,7 +2279,81 @@ void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t databytes){
 //	}
 //	else{
 //		//buffer data into internal m_tx_circular_buffer
-		sd_buf_info=m_proxy_port->bufferTxData(pData,databytes);
+		sd_buf_info=m_proxy_port->bufferTxData(pData,dataBytes);
+#if USE_RTT_LOG==1
+		if(!m_9bits_mode){
+			switch (dataBytes){
+				case 1:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0]);
+					break;
+					}
+				case 2:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1]);
+					break;
+					}
+				case 3:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2]);
+					break;
+				}
+				case 4:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3]);
+					break;
+				}
+				case 5:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3],pData[4]);
+					break;
+				}
+				case 6:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3],pData[4],pData[5]);
+					break;
+				}
+				case 7:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, content=%x %x %x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3],pData[4],pData[5],pData[6]);
+					break;
+				}
+				default:{
+					LOG_DEBUG("Port %d delegate to port %d: dataBytes=%d, last=%x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[dataBytes-1]);//buf2HexString(m_tx_last.pdata,m_tx_last.dataBytes).c_str());
+				}
+		}
+	}
+	else{
+		uint16_t *pU16 = (uint16_t *)pData;
+
+		switch (dataBytes){
+				case 1:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[0],pU16[1]);
+					break;
+					}
+				case 2:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[0],pU16[1],pU16[2]);
+					break;
+				}
+				case 3:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[0],pU16[1],pU16[2],pU16[3]);
+					break;
+				}
+				case 4:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[0],pU16[1],pU16[2],pU16[3],pU16[4]);
+					break;
+				}
+				case 5:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[0],pU16[1],pU16[2],pU16[3],pU16[4],pU16[5]);
+					break;
+				}
+				case 6:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3],pData[4],pData[5],pData[6]);
+					break;
+				}
+				case 7:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, content=%x %x %x %x %x %x %x %x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pData[0],pData[1],pData[2],pData[3],pData[4],pData[5],pData[6],pData[7]);
+					break;
+				}
+				default:{
+					LOG_DEBUG("Port %d del 9bit to port %d: dataBytes=%d, last=%x\r\n",m_port_index,m_proxy_port->m_port_index,dataBytes,pU16[dataBytes-1]);//buf2HexString(m_tx_last.pdata,m_tx_last.dataBytes).c_str());
+				}
+		}
+	}
+#endif
 //	}
 	//enqueue the buffered data
 	xQueueSend(m_proxy_port->m_tx_queue_meta,(const void *)(&sd_buf_info),0);
@@ -2379,7 +2460,7 @@ void SlimSerial::enableProxy(uint8_t proxy_port_index,uint32_t proxy_port_baudra
 		m_proxy_port->m_tx_circular_buf.init((uint8_t *)SLIMSERIAL_PROXY_CIRCULAR_BUFFER,SLIMSERIAL_PROXY_CIRCULAR_BUFFER_SIZE,m_enable_9bits_proxy);
 
 		//configure the proxy port's 9 bits mode according to the enable_9bits_proxy. This needs to be restored when disabling proxy
-		m_proxy_port->config9bitMode(m_enable_9bits_proxy);
+		m_proxy_port->reconfigure(m_enable_9bits_proxy);
 
 		//send acknowledgment
 		ackProxy();
@@ -2396,16 +2477,16 @@ void SlimSerial::disableProxy(bool ackFlag){
  		//TODO: Send the disable command to the proxy network with m_9bits_mode_original or m_9bits_mode?
 		m_proxy_port->transmitFrameLL(0x00,FUNC_DISABLE_PROXY_INTERNAL,NULL,0);
 
-		HAL_Delay(2);//wait for 2ms to let the command be sent out
+		osDelay(2);//wait for 2ms to let the command be sent out
 
 		//restore proxy port's tx buffer to be its original circular buffer
 		m_proxy_port->m_tx_circular_buf.init((uint8_t *)(m_proxy_port->m_tx_circular_buf_data),m_proxy_port->m_tx_circular_buf_size,m_proxy_port->m_enable_9bits_proxy);
 
 		//restore proxy port's original 9bits mode
-		m_proxy_port->config9bitMode(m_proxy_port->m_9bits_mode_original);
+		m_proxy_port->reconfigure(m_proxy_port->m_9bits_mode_original);
 
 		//restore baudrate if necessary
-		m_proxy_port->setBaudrate();
+//		m_proxy_port->setBaudrate();
 
 		m_proxy_port->m_proxy_mode = SLIMSERIAL_TXRX_NORMAL;
 		m_proxy_port->m_proxy_port = NULL;
@@ -2427,46 +2508,46 @@ void SlimSerial::disableProxy(bool ackFlag){
 
 //0 for original baudrate
 void SlimSerial::setBaudrate(uint32_t baudrate){
-	if(baudrate!=m_last_baudrate){
-		uint32_t pclk;
-		UART_HandleTypeDef *huart = m_huart;
-		#if defined(USART6) && defined(UART9) && defined(UART10)
-			if ((huart->Instance == USART1) || (huart->Instance == USART6) || (huart->Instance == UART9) || (huart->Instance == UART10))
-			{
-			pclk = HAL_RCC_GetPCLK2Freq();
-			}
-		#elif defined(USART6)
-			if ((huart->Instance == USART1) || (huart->Instance == USART6))
-			{
-			pclk = HAL_RCC_GetPCLK2Freq();
-			}
-		#else
-			if (huart->Instance == USART1)
-			{
-			pclk = HAL_RCC_GetPCLK2Freq();
-			}
-		#endif /* USART6 */
-			else
-			{
-			pclk = HAL_RCC_GetPCLK1Freq();
-			}
-		/*-------------------------- USART BRR Configuration ---------------------*/
-	
-		m_last_baudrate = baudrate;
-		if(m_last_baudrate == 0){
-			baudrate = huart->Init.BaudRate;
-		}
-		__HAL_UART_DISABLE(huart);
-		if (huart->Init.OverSampling == UART_OVERSAMPLING_8)
-		{
-			huart->Instance->BRR = UART_BRR_SAMPLING8(pclk, baudrate);
-		}
-		else
-		{
-			huart->Instance->BRR = UART_BRR_SAMPLING16(pclk, baudrate);
-		}
-		__HAL_UART_ENABLE(huart);
-	}
+//	if(baudrate!=m_last_baudrate){
+//		uint32_t pclk;
+//		UART_HandleTypeDef *huart = m_huart;
+//		#if defined(USART6) && defined(UART9) && defined(UART10)
+//			if ((huart->Instance == USART1) || (huart->Instance == USART6) || (huart->Instance == UART9) || (huart->Instance == UART10))
+//			{
+//			pclk = HAL_RCC_GetPCLK2Freq();
+//			}
+//		#elif defined(USART6)
+//			if ((huart->Instance == USART1) || (huart->Instance == USART6))
+//			{
+//			pclk = HAL_RCC_GetPCLK2Freq();
+//			}
+//		#else
+//			if (huart->Instance == USART1)
+//			{
+//			pclk = HAL_RCC_GetPCLK2Freq();
+//			}
+//		#endif /* USART6 */
+//			else
+//			{
+//			pclk = HAL_RCC_GetPCLK1Freq();
+//			}
+//		/*-------------------------- USART BRR Configuration ---------------------*/
+//
+//		m_last_baudrate = baudrate;
+//		if(m_last_baudrate == 0){
+//			baudrate = huart->Init.BaudRate;
+//		}
+//		__HAL_UART_DISABLE(huart);
+//		if (huart->Init.OverSampling == UART_OVERSAMPLING_8)
+//		{
+//			huart->Instance->BRR = UART_BRR_SAMPLING8(pclk, baudrate);
+//		}
+//		else
+//		{
+//			huart->Instance->BRR = UART_BRR_SAMPLING16(pclk, baudrate);
+//		}
+//		__HAL_UART_ENABLE(huart);
+//	}
 	
   
 }
@@ -2658,7 +2739,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 }
 void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
 
-#if defined(__STM32F0xx_HAL_H)
+#if defined(__STM32F0xx_HAL_H) || defined(STM32H743xx)
 	uint32_t isrflags   = READ_REG(huart->Instance->ISR);
 	uint32_t errorflags = (isrflags & (uint32_t)(USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE | USART_ISR_NE));
 #elif defined(__STM32F4xx_HAL_H)
@@ -2670,6 +2751,8 @@ void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
 	if ((errorflags != RESET) && ((cr3its & USART_CR3_EIE) == RESET)){
 	  /* If error interrupt is not enabled, clear the error flags */
 	  __HAL_UART_CLEAR_PEFLAG(huart);
+	  __HAL_UART_CLEAR_FEFLAG(huart);
+	  __HAL_UART_CLEAR_OREFLAG(huart);
 	}
 }
 }
