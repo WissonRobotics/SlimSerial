@@ -177,10 +177,9 @@ public:
 
 	SD_BUF_INFO &transmitReceiveData(uint8_t *pdata,uint16_t dataBytes,float timeout,bool frameTypeFilterOn=true);
 
-#if SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED==1
 	SD_BUF_INFO &modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS=20);
 	SD_BUF_INFO &modbusWrite(uint8_t des, uint16_t reg_address,uint16_t reg_data,uint16_t timeoutMS=20);
-#endif
+
 
 	uint32_t readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout);
 

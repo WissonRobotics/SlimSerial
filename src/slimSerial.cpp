@@ -1620,6 +1620,8 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 
 #if SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED==1
 SD_BUF_INFO &SlimSerial::modbusRead(uint8_t des, uint16_t reg_address,uint16_t reg_count,uint16_t timeoutMS){
+
+
 	std::array<uint8_t,8> readFrame={des,0x03,(uint8_t)(reg_address>>8),(uint8_t)(reg_address&0xFF),(uint8_t)(reg_count>>8),(uint8_t)(reg_count&0xFF),0,0};
 	uint16_t crc = SD_CRC_Calculate(&readFrame[0], 6);
 	readFrame[6] = (uint8_t) (crc &0xFF);
@@ -2266,8 +2268,12 @@ void SlimSerial::clearFlags(){
 //	  *            @arg @ref UART_CLEAR_LBDF     LIN Break Detection Clear Flag
 //	  *            @arg @ref UART_CLEAR_CTSF     CTS Interrupt Clear Flag
 //	  *            @arg @ref UART_CLEAR_CMF      Character Match Clear Flag
-  	__HAL_UART_CLEAR_FLAG(m_huart,UART_CLEAR_PEF|UART_CLEAR_FEF|UART_CLEAR_NEF|UART_CLEAR_OREF|UART_CLEAR_IDLEF|
-  							UART_CLEAR_TCF);
+#if defined(__STM32F0xx_HAL_H) || defined(STM32H743xx)
+	  	__HAL_UART_CLEAR_FLAG(m_huart,UART_CLEAR_PEF|UART_CLEAR_FEF|UART_CLEAR_NEF|UART_CLEAR_OREF|UART_CLEAR_IDLEF|
+	  							UART_CLEAR_TCF);
+#elif defined(__STM32F4xx_HAL_H)
+	__HAL_UART_CLEAR_PEFLAG(m_huart);
+#endif
 }
 
 uint32_t SlimSerial::getRxIdleTimeUs(){
@@ -2771,8 +2777,15 @@ void Slim_USART_IRQHandler(UART_HandleTypeDef *huart) {
 
 	if ((errorflags != RESET) && ((cr3its & USART_CR3_EIE) == RESET)){
 	  /* If error interrupt is not enabled, clear the error flags */
+
+#if defined(__STM32F0xx_HAL_H) || defined(STM32H743xx)
 	  	__HAL_UART_CLEAR_FLAG(huart,UART_CLEAR_PEF|UART_CLEAR_FEF|UART_CLEAR_NEF|UART_CLEAR_OREF|UART_CLEAR_IDLEF|
 	  							UART_CLEAR_TCF);
 	}
+#elif defined(__STM32F4xx_HAL_H)
+
+	__HAL_UART_CLEAR_PEFLAG(huart);
+	}
+#endif
 }
 }
