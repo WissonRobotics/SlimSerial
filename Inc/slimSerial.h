@@ -71,8 +71,6 @@ typedef struct SLIMSERIAL_FRAME_TYPE_3_MODBUS_TAG {
 
 } __attribute__((packed)) SLIMSERIAL_FRAME_STRUCT_TYPE_3;
 
-
-
 typedef enum
 {
   SD_USART_OK       = 0x00U,
@@ -172,6 +170,7 @@ public:
 	SD_USART_StatusTypeDef transmitFrame(uint16_t address,uint16_t fcode,uint8_t *payload=0,uint16_t payloadBytes=0);
 
 	SD_USART_StatusTypeDef transmitData(uint8_t *pdata,uint16_t dataBytes);
+	SD_USART_StatusTypeDef transmitDataInplace(uint8_t *pdata,uint16_t dataBytes);
 
 	SD_BUF_INFO &transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload=NULL,uint16_t payloadBytes=0,float timeout=20);
 
@@ -340,8 +339,8 @@ private:
 	SLIM_CURCULAR_BUFFER m_rx_circular_buf;
 
 	//tx data
-	uint8_t m_tx_queue_meta_data_buf[ SLIMSERIAL_TX_QUEUE_MAX_LEN * sizeof(SD_BUF_INFO) ];
-	StaticQueue_t m_tx_queue_meta_data;
+	uint8_t m_tx_queue_meta_data_buf[ SLIMSERIAL_TX_QUEUE_MAX_LEN * sizeof(SD_BUF_INFO) ]={};
+	StaticQueue_t m_tx_queue_meta_data={};
 	QueueHandle_t m_tx_queue_meta;
 
 	SD_BUF_INFO m_tx_last;

@@ -1075,7 +1075,6 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 	}
 }
 
-
 //this function will be executed in an async thread
 SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataBytes){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
@@ -1085,6 +1084,23 @@ SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataByte
 		return SD_USART_ERROR;
 	}
 }
+
+//this function will be executed in an async thread
+SD_USART_StatusTypeDef SlimSerial::transmitDataInplace(uint8_t *pdata,uint16_t dataBytes){
+	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+		SD_BUF_INFO sd_buf_info={pdata,dataBytes};
+
+		//enqueue the buffered data
+		xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
+
+		//enqueue and try to trigger a transmit
+		return transmitLL_try();
+	}
+	else{
+		return SD_USART_ERROR;
+	}
+}
+
 
 //transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
@@ -1098,6 +1114,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fco
 	//enqueue and transmit
 	return transmitLL_try();
 }
+
 
 //transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBytes){
