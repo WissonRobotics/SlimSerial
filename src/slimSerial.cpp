@@ -43,8 +43,10 @@ uint8_t USART1_RX_FRAME_BUFFER[USART1_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL1_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
-SlimSerial slimSerial1(&huart1,
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
+SlimSerial  slimSerial1(&huart1,
 		(uint16_t *)USART1_TX_CIRCULAR_BUFFER,USART1_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART1_RX_CIRCULAR_BUFFER,USART1_RX_CIRCULAR_BUFFER_SIZE,
 		USART1_RX_FRAME_BUFFER,USART1_RX_FRAME_MAX_SIZE,
@@ -55,6 +57,7 @@ SlimSerial slimSerial1(&huart1,
 		USART1_RX_MODE,
 		USART1_9_BITS_MODE,
 		USART1_TIMEOUT_TIMER_INDEX);
+
 #endif
 
 #if ENABLE_SLIMSERIAL_USART2==1
@@ -92,7 +95,9 @@ uint8_t USART2_RX_FRAME_BUFFER[USART2_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL2_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial2(&huart2,
 		(uint16_t *)USART2_TX_CIRCULAR_BUFFER,USART2_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART2_RX_CIRCULAR_BUFFER,USART2_RX_CIRCULAR_BUFFER_SIZE,
@@ -140,7 +145,9 @@ uint8_t USART3_RX_FRAME_BUFFER[USART3_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL3_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial3(&huart3,
 		(uint16_t *)USART3_TX_CIRCULAR_BUFFER,USART3_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART3_RX_CIRCULAR_BUFFER,USART3_RX_CIRCULAR_BUFFER_SIZE,
@@ -188,7 +195,9 @@ uint8_t USART4_RX_FRAME_BUFFER[USART4_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL4_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial4(&huart4,
 		(uint16_t *)USART4_TX_CIRCULAR_BUFFER,USART4_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART4_RX_CIRCULAR_BUFFER,USART4_RX_CIRCULAR_BUFFER_SIZE,
@@ -235,6 +244,9 @@ uint8_t USART5_RX_FRAME_BUFFER[USART5_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL5_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial5(&huart5,
 		(uint16_t *)USART5_TX_CIRCULAR_BUFFER,USART5_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART5_RX_CIRCULAR_BUFFER,USART5_RX_CIRCULAR_BUFFER_SIZE,
@@ -280,7 +292,9 @@ uint8_t USART6_RX_FRAME_BUFFER[USART6_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL6_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial6(&huart6,
 		(uint16_t *)USART6_TX_CIRCULAR_BUFFER,USART6_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART6_RX_CIRCULAR_BUFFER,USART6_RX_CIRCULAR_BUFFER_SIZE,
@@ -326,7 +340,9 @@ uint8_t USART7_RX_FRAME_BUFFER[USART7_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL7_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial7(&huart7,
 		(uint16_t *)USART7_TX_CIRCULAR_BUFFER,USART7_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART7_RX_CIRCULAR_BUFFER,USART7_RX_CIRCULAR_BUFFER_SIZE,
@@ -373,7 +389,9 @@ uint8_t USART8_RX_FRAME_BUFFER[USART8_RX_FRAME_MAX_SIZE];
 #endif
 #endif
 #define SLIMSERIAL8_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
-
+#if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
+__attribute__((section(".ccmram")))
+#endif
 SlimSerial slimSerial8(&huart8,
 		(uint16_t *)USART8_TX_CIRCULAR_BUFFER,USART8_TX_CIRCULAR_BUFFER_SIZE,
 		(uint16_t *)USART8_RX_CIRCULAR_BUFFER,USART8_RX_CIRCULAR_BUFFER_SIZE,
@@ -1075,6 +1093,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 	}
 }
 
+
 //this function will be executed in an async thread
 SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataBytes){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
@@ -1084,23 +1103,6 @@ SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataByte
 		return SD_USART_ERROR;
 	}
 }
-
-//this function will be executed in an async thread
-SD_USART_StatusTypeDef SlimSerial::transmitDataInplace(uint8_t *pdata,uint16_t dataBytes){
-	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
-		SD_BUF_INFO sd_buf_info={pdata,dataBytes};
-
-		//enqueue the buffered data
-		xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
-
-		//enqueue and try to trigger a transmit
-		return transmitLL_try();
-	}
-	else{
-		return SD_USART_ERROR;
-	}
-}
-
 
 //transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes){
@@ -1114,7 +1116,6 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fco
 	//enqueue and transmit
 	return transmitLL_try();
 }
-
 
 //transmit a frame directly, used in proxy mode
 SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBytes){
