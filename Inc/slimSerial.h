@@ -82,6 +82,19 @@ typedef enum
   SD_USART_ERROR,
 } SD_USART_StatusTypeDef;
 
+typedef struct SLIMSERIAL_FRAME_TYPE_11_LONG_TAG {
+
+	uint8_t header[2];
+	uint16_t payloadBytes;
+	uint8_t funcode;
+	union {
+		uint8_t data8[INTERNAL_MAX_FRAME_SIZE];
+		int16_t data16[INTERNAL_MAX_FRAME_SIZE/2];
+		uint16_t dataU16[INTERNAL_MAX_FRAME_SIZE/2];
+	} payload;
+
+} __attribute__((packed)) SLIMSERIAL_FRAME_STRUCT_TYPE_11_LONG;
+
 typedef struct SD_BUF_TAG{
 	uint8_t *pdata;
 	uint16_t dataBytes;
@@ -195,6 +208,7 @@ public:
 	void toggleHeaderFilter(bool filterOn);
     void toggleAddressFilter(bool filterOn);
 	void toggleFuncodeFilter(bool filterOn);
+	void toggleCRCFilter(bool filterOn);
 
     void toggle485Tx(bool txOn);
 
@@ -327,6 +341,8 @@ private:
 	uint8_t funcodeFilter[SLIMSERIAL_FUNCODE_FILTER_MAX_LEN];
 	bool funcodeFilterOn;
 	uint8_t funcodeFilter_num;
+
+	bool crcFilterOn=true;
 
 	bool lengthFilterOn;
 

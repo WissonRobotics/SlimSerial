@@ -18,6 +18,7 @@
 /*
 SLIMSERIAL_FRAME_TYPE_0_ANY:  	receive any rx and trigger a rx callback based on idle line dectection.
 SLIMSERIAL_FRAME_TYPE_1:  		Frame: Header1 Header2 Src Len Func  + payloads + crc16.  Trigger a rx callback for a valid frame
+SLIMSERIAL_FRAME_TYPE_11: 		Frame: Header1 Header2 Src LenLow LenHigh Func + payloads + crc16. Trigger a rx callback for a valid frame
 SLIMSERIAL_FRAME_TYPE_2:  		Frame: Header1 Header2 Len Func  + payloads + crc16. Trigger a rx callback for a valid frame
 SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM: Frame: MODBUS SERVER frame.  Trigger a rx callback for a valid frame
 SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM: Frame: MODBUS CLIENT frame.  Trigger a rx callback for a valid frame
@@ -28,6 +29,7 @@ SLIMSERIAL_FRAME_TYPE_NONE:  	receive any rx without triggering rx callback.  Re
 #define SLIMSERIAL_FRAME_TYPE_2					2
 #define SLIMSERIAL_FRAME_TYPE_MODBUS_SERVER_NUM 3
 #define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM 4
+#define SLIMSERIAL_FRAME_TYPE_11_LONG			11
 #define SLIMSERIAL_FRAME_TYPE_NONE 				99
 
 

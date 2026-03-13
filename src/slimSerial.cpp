@@ -41,6 +41,10 @@ uint8_t USART1_RX_FRAME_BUFFER[USART1_RX_FRAME_MAX_SIZE];
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
+#elif USART1_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
+#endif
 #endif
 #define SLIMSERIAL1_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 #if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
@@ -93,6 +97,10 @@ uint8_t USART2_RX_FRAME_BUFFER[USART2_RX_FRAME_MAX_SIZE];
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
+#elif USART2_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
+#endif
 #endif
 #define SLIMSERIAL2_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 #if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
@@ -142,6 +150,10 @@ uint8_t USART3_RX_FRAME_BUFFER[USART3_RX_FRAME_MAX_SIZE];
 #elif USART3_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
+#endif
+#elif USART3_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
 #endif
 #endif
 #define SLIMSERIAL3_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
@@ -193,6 +205,10 @@ uint8_t USART4_RX_FRAME_BUFFER[USART4_RX_FRAME_MAX_SIZE];
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
+#elif USART4_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
+#endif
 #endif
 #define SLIMSERIAL4_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 #if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
@@ -242,6 +258,10 @@ uint8_t USART5_RX_FRAME_BUFFER[USART5_RX_FRAME_MAX_SIZE];
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
+#elif USART5_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
+#endif
 #endif
 #define SLIMSERIAL5_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 #if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
@@ -289,6 +309,10 @@ uint8_t USART6_RX_FRAME_BUFFER[USART6_RX_FRAME_MAX_SIZE];
 #elif USART6_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
+#endif
+#elif USART6_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
 #endif
 #endif
 #define SLIMSERIAL6_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
@@ -338,6 +362,10 @@ uint8_t USART7_RX_FRAME_BUFFER[USART7_RX_FRAME_MAX_SIZE];
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
 #endif
+#elif USART7_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
+#endif
 #endif
 #define SLIMSERIAL7_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
 #if defined(__STM32F4xx_HAL_H)  //F4 has CCMRAM
@@ -386,6 +414,10 @@ uint8_t USART8_RX_FRAME_BUFFER[USART8_RX_FRAME_MAX_SIZE];
 #elif USART8_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM
 #ifndef SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED
 	#define SLIMSERIAL_FRAME_TYPE_MODBUS_CLIENT_NUM_USED 1
+#endif
+#elif USART8_FRAME_TYPE == SLIMSERIAL_FRAME_TYPE_11_LONG
+#ifndef SLIMSERIAL_FRAME_TYPE_11_LONG_USED
+	#define SLIMSERIAL_FRAME_TYPE_11_LONG_USED 1
 #endif
 #endif
 #define SLIMSERIAL8_RX_TASK_BUFFER_SIZE SLIMSERIAL_RX_TASK_BUFFER_SIZE
@@ -476,6 +508,9 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 
 	//add funcode filter
 	toggleFuncodeFilter(false);
+
+	//default enable crc check
+	toggleCRCFilter(true);
 
 	//
 	lengthFilterOn=true;
@@ -1037,6 +1072,9 @@ bool SlimSerial::applyFuncodeFilter(uint8_t funcodeIn){
 
 	return false;
 }
+void SlimSerial::toggleCRCFilter(bool filterOn){
+	crcFilterOn = filterOn;
+}
 
 
 void SlimSerial::toggle485Tx(bool txOn){
@@ -1092,6 +1130,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode
 		return SD_USART_ERROR;
 	}
 }
+
 
 //this function will be executed in an async thread
 SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataBytes){
@@ -1384,60 +1423,10 @@ SD_BUF_INFO SlimSerial::bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8
 SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pSrc,uint16_t datalen) {
 	return bufferTxData(m_tx_circular_buf, pSrc, datalen);
 }
-
-SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc) {
-
-	SD_BUF_INFO sd_buf_info;
-	uint8_t payloadBytes=0;
-
-	//if not enough continuous space in the circular buffer, add a dummy data to the circular buffer to ensure the next in() will be at the new head position
-	if(m_tx_circular_buf.unusedContinuousSpace()<m_tx_circular_buf.bufferSize/2){//less than half of the buffer is available
-		m_tx_circular_buf.in_dummy_with_new_masked_head(0);
-	}
-
-	sd_buf_info.pdata = m_tx_circular_buf.getHeadMasked();
-
-
-	//for 9-bit mode, add address byte with 9's bit set first
-	if(m_9bits_mode){
-		uint16_t addressU16 = (uint16_t)((address&0x0F) | 0x100); //set the 9th bit
-		m_tx_circular_buf.in((uint16_t *)(&addressU16),1);
-	}
-
-	//add frame prefix with 0 payloadBytes
-	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, payloadBytes, fcode};
-	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
-
-	//add the payload
-	if(m_9bits_mode){
-		payloadBytes = payloadFunc((uint8_t *)(((uint16_t *)sd_buf_info.pdata)+6), true); //it is the payload function's responsiblity to correctly fill the payload bytes with U8 or U16 data
-	}
-	else{
-		payloadBytes = payloadFunc(((uint8_t *)sd_buf_info.pdata)+5, false);
-	}
-	m_tx_circular_buf.in_dummy(payloadBytes); //add the payload bytes
-
-	//update the payload bytes in the frame prefix
-	if(m_9bits_mode){
-		((uint16_t *)sd_buf_info.pdata)[4] = payloadBytes; //update the payload bytes in the frame prefix
-	}
-	else{
-		sd_buf_info.pdata[3] = payloadBytes; //update the payload bytes in the frame prefix
-	}
-
-	//add CRC (not including the 9-bit address)
-	uint16_t crcU16= m_9bits_mode?SD_CRC_Calculate_U16LB(((uint16_t *)sd_buf_info.pdata)+1, payloadBytes + 5):SD_CRC_Calculate(sd_buf_info.pdata, payloadBytes + 5);
-	m_tx_circular_buf.in((uint8_t *)(&crcU16),2); //add the CRC bytes
-
-	sd_buf_info.dataBytes = payloadBytes + 7;
-
-	return sd_buf_info;
-}
-
-
+ 
 SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *payload,uint16_t payloadBytes) {
 	SD_BUF_INFO sd_buf_info;
-	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame prefix and CRC
+	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame 1 and 11
 
 	//if not enough continuous space in the circular buffer, add a dummy data to the circular buffer to ensure the next in() will be at the new head position
 	if((frameBytes+1u)>m_tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
@@ -1454,7 +1443,11 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 	}
 
 	//add frame prefix
-	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, (uint8_t)payloadBytes, fcode};
+	std::array<uint8_t,5> frame_prefix = {0x5A, 0xA5, address, (uint8_t)payloadBytes, fcode}; //default use frame type 1
+	if(m_rx_frame_type== SLIMSERIAL_FRAME_TYPE_11_LONG){
+		frame_prefix[2]= (uint8_t)(payloadBytes & 0xFF);
+		frame_prefix[3]= (uint8_t)((payloadBytes >> 8) & 0xFF);
+	}
 	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
 
 	//add the payload
@@ -1862,8 +1855,12 @@ void SlimSerial::frameParser(){
 								if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 									//valid CRC
-									uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-									uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+									uint16_t crc1 = 0;
+									uint16_t crc2 = 0;
+									if(crcFilterOn){
+										crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+										crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+									}
 									if (crc1 == crc2) {
 
 										//read out one valid frame from ring buffer to m_rx_last
@@ -1991,6 +1988,83 @@ void SlimSerial::frameParser(){
 		}
 #endif
 	}
+#if SLIMSERIAL_FRAME_TYPE_11_LONG_USED==1
+	else if(m_rx_frame_type==SLIMSERIAL_FRAME_TYPE_11_LONG){
+		while (m_parse_remainingBytes >= 7) {
+
+			uint8_t header[2]={m_rx_circular_buf.peekAt(0),m_rx_circular_buf.peekAt(1)};
+			if (applyHeaderFilter(header[0], header[1])) {
+ 
+				uint8_t funcodeIn = m_rx_circular_buf.peekAt(4);
+				if(applyFuncodeFilter(funcodeIn)){
+
+					uint16_t expectedFrameBytes = ((uint16_t)m_rx_circular_buf.peekAt(2) | ((uint16_t)m_rx_circular_buf.peekAt(3) << 8)) + 7;
+
+					if (expectedFrameBytes <= m_rx_frame_buf_size){
+
+						if (expectedFrameBytes <= m_parse_remainingBytes) {
+
+							//valid CRC
+							uint16_t crc1 = 0;
+							uint16_t crc2 = 0;
+							if(crcFilterOn){
+								crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+								crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+							}
+							if (crc1 == crc2) {
+								m_rx_circular_buf.out(m_rx_last.pdata, expectedFrameBytes);
+								m_rx_last.dataBytes = expectedFrameBytes;
+								m_parse_remainingBytes -= expectedFrameBytes;
+
+								receivedACK = true;
+
+								m_totalRxFrames++;
+								m_rx_time_validFrame = currentTime_us();
+								m_rx_time_validFrame_cost = m_rx_time_validFrame - m_rx_time_start;
+
+								callRxCallbackArray(this,m_rx_last.pdata, m_rx_last.dataBytes);
+
+								if (txrxThreadID != NULL) {
+									xTaskGenericNotify((TaskHandle_t)(txrxThreadID),SLIMSERIAL_NOTIFICATION_BIT_FRAME,eSetBits,NULL);
+								}
+
+								m_rx_status = SD_USART_OK;
+								continue;
+							}
+							else {
+								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+								m_parse_remainingBytes -= discardN;
+								m_rx_status = SD_USART_ERROR;
+								continue;
+							}
+						} else {
+							m_rx_status = SD_USART_BUSY;
+							break;
+
+						}
+					}
+					else{
+						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+						m_parse_remainingBytes -= discardN;
+						m_rx_status = SD_USART_ERROR;
+						continue;
+					}
+				}
+				else{
+					int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+					m_parse_remainingBytes -= discardN;
+					m_rx_status = SD_USART_ERROR;
+					continue;
+				}
+			} else {
+				int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
+				m_parse_remainingBytes -= discardN;
+				m_rx_status = SD_USART_ERROR;
+				continue;
+			}
+		}
+	}
+#endif
 #if SLIMSERIAL_FRAME_TYPE_2_USED==1
 	else if (m_rx_frame_type == SLIMSERIAL_FRAME_TYPE_2){
 		//std::unique_lock<std::mutex> lk_decode(decodeMtx);
@@ -2018,9 +2092,12 @@ void SlimSerial::frameParser(){
 					if (expectedFrameBytes <= m_parse_remainingBytes) {
 
 						//valid CRC
-						uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-						uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
-
+						uint16_t crc1 = 0;
+						uint16_t crc2 = 0;
+						if(crcFilterOn){
+							crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+							crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+						}
 						if (crc1 == crc2) {
 
 							//read out one valid frame from ring buffer to m_rx_last
@@ -2109,9 +2186,12 @@ void SlimSerial::frameParser(){
 					// got enough rx bytes
 					if (m_parse_remainingBytes >= expectedFrameBytes) {
 							//valid CRC
-							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-							uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
-
+							uint16_t crc1 = 0;
+							uint16_t crc2 = 0;
+							if(crcFilterOn){
+								crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+								crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+							}
 							if (crc1 == crc2) {
 
 								//read out one valid frame from ring buffer to m_rx_last
@@ -2215,9 +2295,12 @@ void SlimSerial::frameParser(){
 
 						 if (m_parse_remainingBytes >= expectedFrameBytes) {
 							//valid CRC
-							uint16_t crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
-							uint16_t crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
-
+							uint16_t crc1 = 0;
+							uint16_t crc2 = 0;
+							if(crcFilterOn){
+								crc1 = m_rx_circular_buf.calculateCRC(expectedFrameBytes - 2);
+								crc2 = (uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 2) | ((uint16_t)m_rx_circular_buf.peekAt(expectedFrameBytes - 1))<<8;
+							}
 							if (crc1 == crc2) {
 
 								//read out one valid frame from ring buffer to m_rx_last
