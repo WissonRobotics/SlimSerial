@@ -9,6 +9,25 @@
 #include "RTT_LOG.h"
 #endif
 
+namespace {
+
+uint32_t syncRxDmaCircularBufferHead(SLIM_CURCULAR_BUFFER& rxBuffer, uint32_t newHeadMasked)
+{
+	if (newHeadMasked == 0u && rxBuffer.writeIndexMasked() == 0u) {
+		return 0u;
+	}
+
+	uint32_t len = rxBuffer.syncExternalWriteHeadMaskedLossy(newHeadMasked);
+	if (rxBuffer.isU16Mode() && len > 0u && rxBuffer.availableData() > 0u && ((rxBuffer.peekAt_HB(0) & 0x01u) == 0x01u)) {
+		rxBuffer.discardN(1u);
+		--len;
+	}
+
+	return len;
+}
+
+} // namespace
+
 #if ENABLE_SLIMSERIAL_USART1==1
 #define USART1_TX_CIRCULAR_BUFFER_SIZE USART1_TX_FRAME_MAX_SIZE*2
 #define USART1_RX_CIRCULAR_BUFFER_SIZE USART1_RX_FRAME_MAX_SIZE*2
@@ -989,11 +1008,12 @@ void SlimSerial::addRxFrameCallback(void (*frameCallbackFunc)(SlimSerial *,uint8
 
 
 void SlimSerial::addHeaderFilter(uint8_t h1,uint8_t h2){
+	 if(headerFilter_num >= SLIMSERIAL_HEADER_FILTER_MAX_LEN){
+		 return;
+	 }
 	 headerFilter[headerFilter_num][0]=h1;
 	 headerFilter[headerFilter_num][1]=h2;
-	 if(headerFilter_num<SLIMSERIAL_HEADER_FILTER_MAX_LEN){
-		 headerFilter_num++;
-	 }
+	 headerFilter_num++;
 	 toggleHeaderFilter(true);
 }
 void SlimSerial::toggleHeaderFilter(bool filterOn){
@@ -1004,7 +1024,7 @@ bool SlimSerial::applyHeaderFilter(uint8_t h1In,uint8_t h2In){
 	if(!headerFilterOn)
 		return true;
 
-	for(int i=0;i<headerFilter_num;i++){
+	for(uint8_t i=0;i<headerFilter_num;i++){
 		if(h1In==headerFilter[i][0] && h2In==headerFilter[i][1])
 			return true;
 	}
@@ -1013,10 +1033,11 @@ bool SlimSerial::applyHeaderFilter(uint8_t h1In,uint8_t h2In){
 
 
 void SlimSerial::addAddressFilter(uint8_t address){
-	 addressFilter[addressFilter_num]=address;
-	 if(addressFilter_num<SLIMSERIAL_ADDRESS_FILTER_MAX_LEN){
-		 addressFilter_num++;
+	 if(addressFilter_num >= SLIMSERIAL_ADDRESS_FILTER_MAX_LEN){
+		 return;
 	 }
+	 addressFilter[addressFilter_num]=address;
+	 addressFilter_num++;
 	 m_address = address; //set the address to be the last added address
 
 	 if(m_9bits_mode==1){
@@ -1037,7 +1058,7 @@ bool SlimSerial::applyAddressFilter(uint8_t addressIn){
 	/*add custom address filter here*/
 
 	//internal address whitelist
-	for(int i=0;i<addressFilter_num;i++){
+	for(uint8_t i=0;i<addressFilter_num;i++){
 		if(addressIn==addressFilter[i])
 			return true;
 	}
@@ -1047,11 +1068,12 @@ bool SlimSerial::applyAddressFilter(uint8_t addressIn){
 
 
 void SlimSerial::addFuncodeFilter(uint8_t funcodeIn){
+	if(funcodeFilter_num >= SLIMSERIAL_FUNCODE_FILTER_MAX_LEN){
+		return;
+	}
 	funcodeFilter[funcodeFilter_num]=funcodeIn;
-		 if(funcodeFilter_num<SLIMSERIAL_FUNCODE_FILTER_MAX_LEN){
-			 funcodeFilter_num++;
-		 }
-		 toggleFuncodeFilter(true);
+	funcodeFilter_num++;
+	toggleFuncodeFilter(true);
 }
 void SlimSerial::toggleFuncodeFilter(bool filterOn){
 	funcodeFilterOn = filterOn;
@@ -1065,7 +1087,7 @@ bool SlimSerial::applyFuncodeFilter(uint8_t funcodeIn){
 
 
 	//internal address whitelist
-	for(int i=0;i<funcodeFilter_num;i++){
+	for(uint8_t i=0;i<funcodeFilter_num;i++){
 		if(funcodeIn==funcodeFilter[i])
 			return true;
 	}
@@ -1105,14 +1127,13 @@ uint8_t SlimSerial::getRxFrameType(){
 //transmit a frame if in normal mode
 SD_USART_StatusTypeDef SlimSerial::transmitFrame(uint16_t address,uint16_t fcode,PayloadFunc payloadFunc){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
+		if (payloadFunc == nullptr) {
+			return SD_USART_ERROR;
+		}
+
 		//assemble tx frame in internal buffer,not queued
 		SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payloadFunc);
-
-		//enqueue the buffered data
-		xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
-
-		//enqueue and transmit
-		return transmitLL_try();
+		return enqueueTxBuffer(sd_buf_info);
 	}
 	else{
 		return SD_USART_ERROR;
@@ -1146,12 +1167,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitData(uint8_t *pdata,uint16_t dataByte
 SD_USART_StatusTypeDef SlimSerial::transmitDataInplace(uint8_t *pdata,uint16_t dataBytes){
 	if(getProxyMode()==SLIMSERIAL_TXRX_NORMAL){
 		SD_BUF_INFO sd_buf_info={pdata,dataBytes};
-
-		//enqueue the buffered data
-		xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
-
-		//enqueue and try to trigger a transmit
-		return transmitLL_try();
+		return enqueueTxBuffer(sd_buf_info);
 	}
 	else{
 		return SD_USART_ERROR;
@@ -1164,12 +1180,7 @@ SD_USART_StatusTypeDef SlimSerial::transmitFrameLL(uint16_t address,uint16_t fco
 
 	//buffer data into internal m_tx_circular_buffer, with frame_prefix and crc added
 	SD_BUF_INFO sd_buf_info = bufferTxFrame(address,fcode,payload,payloadBytes);
-
-	//enqueue the buffered data
-	xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
-
-	//enqueue and transmit
-	return transmitLL_try();
+	return enqueueTxBuffer(sd_buf_info);
 }
 
 
@@ -1178,12 +1189,29 @@ SD_USART_StatusTypeDef SlimSerial::transmitDataLL(uint8_t *pdata,uint16_t dataBy
 
 	//buffer data into internal m_tx_circular_buffer
 	SD_BUF_INFO sd_buf_info=bufferTxData(pdata,dataBytes);
+	return enqueueTxBuffer(sd_buf_info);
+}
 
-	//enqueue the buffered data
-	xQueueSend(m_tx_queue_meta,(const void *)(&sd_buf_info),0);
 
-	//enqueue and try to trigger a transmit
-	return transmitLL_try();
+SD_USART_StatusTypeDef SlimSerial::enqueueTxBuffer(const SD_BUF_INFO &txBufInfo){
+	if (m_huart == NULL || m_tx_queue_meta == NULL) {
+		return SD_USART_ERROR;
+	}
+
+	if (txBufInfo.pdata == NULL || txBufInfo.dataBytes == 0) {
+		return SD_USART_BUSY;
+	}
+
+	if(xQueueSend(m_tx_queue_meta, (const void *)(&txBufInfo), 0) != pdPASS){
+		return SD_USART_BUSY;
+	}
+
+	const SD_USART_StatusTypeDef transmitStatus = transmitLL_try();
+	if (transmitStatus == SD_USART_BUSY) {
+		return SD_USART_OK;
+	}
+
+	return transmitStatus;
 }
 
 uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeout){
@@ -1209,6 +1237,10 @@ uint32_t SlimSerial::readBuffer(uint8_t *pdata,uint16_t dataBytes,uint32_t timeo
 
 //trying to send tx queue with tx mutex acquired first
 SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
+	if (m_huart == NULL || m_tx_queue_meta == NULL) {
+		return SD_USART_ERROR;
+	}
+
 	if (!m_writeLocked) {
 		if(pdPASS == xQueueReceive(m_tx_queue_meta, &(m_tx_last), 0)){
 			//get the last tx buffer info from the queue
@@ -1321,6 +1353,10 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL_try(){
 //send data directly, used in txCpltCallback() to transmit the next queued frame without releasing/aquiring the mutex again
 SD_USART_StatusTypeDef SlimSerial::transmitLL(SD_BUF_INFO &txBufInfo){
 
+	if (m_huart == NULL) {
+		return SD_USART_ERROR;
+	}
+
 	m_tx_last = txBufInfo; //save the last transmitted buffer info
 
 	//try to trigger a transmit one the queue's back. This will not take effect is the Tx is already ongoing
@@ -1386,35 +1422,67 @@ SD_USART_StatusTypeDef SlimSerial::transmitLL(SD_BUF_INFO &txBufInfo){
 			ret=HAL_UART_Transmit_IT(m_huart,pbuf,databytes);
 		}
 	}
-	if(ret==HAL_OK || (ret==HAL_BUSY)){
+	if(ret == HAL_OK){
 
 		return SD_USART_OK;
 	}
-	else{
-		return SD_USART_ERROR;
+
+	toggle485Tx(false);
+
+	if(ret == HAL_BUSY){
+		if (m_tx_queue_meta != NULL) {
+			if (__get_IPSR() != 0U) {
+				BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+				xQueueSendToFrontFromISR(m_tx_queue_meta, &m_tx_last, &xHigherPriorityTaskWoken);
+				portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+			}
+			else {
+				xQueueSendToFront(m_tx_queue_meta, &m_tx_last, 0);
+			}
+		}
+
+		m_writeLocked = false;
+		return SD_USART_BUSY;
 	}
+
+	m_writeLocked = false;
+	return SD_USART_ERROR;
 }
 //buffer data to a circular buffer, with address byte in 9-bit mode if the circular buffer is in U16 mode
 SD_BUF_INFO SlimSerial::bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen) {
 
-	SD_BUF_INFO sd_buf_info;
+	SD_BUF_INFO sd_buf_info{};
+	if (pSrc == NULL && datalen > 0) {
+		return sd_buf_info;
+	}
+
+	uint16_t extraBytes = tx_circular_buf.isU16Mode() ? 1u : 0u;
+	if ((datalen + extraBytes) > tx_circular_buf.unusedSpace()) {
+		return sd_buf_info;
+	}
 
 	//if not enough continuous space in the circular buffer, add a dummy data to the circular buffer to ensure the next in() will be at the new head position
-	if((datalen+1u)>tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
-		tx_circular_buf.in_dummy_with_new_masked_head(0);
+	if((datalen + extraBytes)>tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
+		if (!tx_circular_buf.tryInDummy(tx_circular_buf.unusedContinuousSpace())) {
+			return sd_buf_info;
+		}
 	}
 
 	sd_buf_info.pdata = tx_circular_buf.getHeadMasked();
 	sd_buf_info.dataBytes = datalen;
 
 	//for 9-bit mode, add address byte with 9's bit set first
-	if(tx_circular_buf.m_U16_mode){
+	if(tx_circular_buf.isU16Mode()){
 		uint16_t addressU16 = (uint16_t)((m_9bits_mode_address_tx&0x0F) | 0x100); //set the 9th bit
-		tx_circular_buf.in((uint16_t *)(&addressU16),1);
+		if (!tx_circular_buf.tryIn((uint16_t *)(&addressU16),1u)) {
+			return SD_BUF_INFO{};
+		}
 	}
 
 	//add the data
-	tx_circular_buf.in(pSrc,datalen);
+	if (datalen > 0 && !tx_circular_buf.tryIn(pSrc,datalen)) {
+		return SD_BUF_INFO{};
+	}
 
 	return sd_buf_info;
 }
@@ -1423,14 +1491,34 @@ SD_BUF_INFO SlimSerial::bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8
 SD_BUF_INFO SlimSerial::bufferTxData(uint8_t *pSrc,uint16_t datalen) {
 	return bufferTxData(m_tx_circular_buf, pSrc, datalen);
 }
+
+SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,PayloadFunc payloadFunc) {
+	if (payloadFunc == nullptr) {
+		return SD_BUF_INFO{};
+	}
+
+	std::array<uint8_t, 0xFFu> payloadBuffer{};
+	const uint8_t payloadBytes = payloadFunc(payloadBuffer.data(), m_9bits_mode != 0u);
+	return bufferTxFrame(address, fcode, payloadBuffer.data(), payloadBytes);
+}
  
 SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *payload,uint16_t payloadBytes) {
-	SD_BUF_INFO sd_buf_info;
+	SD_BUF_INFO sd_buf_info{};
+	if (payload == NULL && payloadBytes > 0) {
+		return sd_buf_info;
+	}
+
 	uint16_t frameBytes = payloadBytes + 7; //7 bytes for the frame 1 and 11
+	uint16_t extraBytes = m_9bits_mode ? 1u : 0u;
+	if ((frameBytes + extraBytes) > m_tx_circular_buf.unusedSpace()) {
+		return sd_buf_info;
+	}
 
 	//if not enough continuous space in the circular buffer, add a dummy data to the circular buffer to ensure the next in() will be at the new head position
-	if((frameBytes+1u)>m_tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
-		m_tx_circular_buf.in_dummy_with_new_masked_head(0);
+	if((frameBytes + extraBytes)>m_tx_circular_buf.unusedContinuousSpace()){//one additional byte for the address byte in 9-bit mode
+		if (!m_tx_circular_buf.tryInDummy(m_tx_circular_buf.unusedContinuousSpace())) {
+			return sd_buf_info;
+		}
 	}
 
 	sd_buf_info.pdata = m_tx_circular_buf.getHeadMasked();
@@ -1439,7 +1527,9 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 	//for 9-bit mode, add address byte with 9's bit set first
 	if(m_9bits_mode){
 		uint16_t addressU16 = (uint16_t)((address&0x0F) | 0x100); //set the 9th bit
-		m_tx_circular_buf.in((uint16_t *)(&addressU16),1);
+		if (!m_tx_circular_buf.tryIn((uint16_t *)(&addressU16),1u)) {
+			return SD_BUF_INFO{};
+		}
 	}
 
 	//add frame prefix
@@ -1448,17 +1538,45 @@ SD_BUF_INFO SlimSerial::bufferTxFrame(uint8_t address,uint8_t fcode,uint8_t *pay
 		frame_prefix[2]= (uint8_t)(payloadBytes & 0xFF);
 		frame_prefix[3]= (uint8_t)((payloadBytes >> 8) & 0xFF);
 	}
-	m_tx_circular_buf.in((uint8_t *)(&frame_prefix[0]), sizeof(frame_prefix)); //add the frame_prefix
+	if (!m_tx_circular_buf.tryIn(frame_prefix.data(), sizeof(frame_prefix))) {
+		return SD_BUF_INFO{};
+	}
 
 	//add the payload
-	m_tx_circular_buf.in(payload,payloadBytes);
+	if (payloadBytes > 0 && !m_tx_circular_buf.tryIn(payload,payloadBytes)) {
+		return SD_BUF_INFO{};
+	}
 
 	//add CRC (not including the 9-bit address)
 	uint16_t crcU16= m_9bits_mode?SD_CRC_Calculate_U16LB(((uint16_t *)sd_buf_info.pdata)+1, payloadBytes + 5):SD_CRC_Calculate(sd_buf_info.pdata, payloadBytes + 5);
-	m_tx_circular_buf.in((uint8_t *)(&crcU16),2); //add the CRC bytes
+	if (!m_tx_circular_buf.tryIn((uint8_t *)(&crcU16),2u)) {
+		return SD_BUF_INFO{};
+	}
 
 
 	return sd_buf_info;
+}
+
+uint32_t SlimSerial::discardUntilNextHeaderCandidate(uint8_t fallbackHeader){
+	if(!headerFilterOn || headerFilter_num == 0){
+		return m_rx_circular_buf.discardN(1);
+	}
+
+	const uint32_t remainingBytes = m_rx_circular_buf.availableData();
+	for(uint32_t index = 1; index < remainingBytes; ++index){
+		const uint8_t candidate = m_rx_circular_buf.peekAt(index);
+		if(candidate == fallbackHeader){
+			return m_rx_circular_buf.discardN(index);
+		}
+
+		for(uint8_t headerIndex = 0; headerIndex < headerFilter_num; ++headerIndex){
+			if(candidate == headerFilter[headerIndex][0]){
+				return m_rx_circular_buf.discardN(index);
+			}
+		}
+	}
+
+	return m_rx_circular_buf.discardN(remainingBytes);
 }
 
 
@@ -1627,7 +1745,7 @@ void SlimSerial::start_Rx_DMA_Idle_Circular(){
 	HAL_UART_AbortReceive(m_huart);
 
 	clearFlags();
-	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.buffer, m_rx_circular_buf.bufferSize) != HAL_OK)
+	while(Slim_UARTEx_ReceiveToIdle_DMA(m_huart, m_rx_circular_buf.data(), static_cast<uint16_t>(m_rx_circular_buf.capacity())) != HAL_OK)
 	{
 		m_huart->hdmarx->State=HAL_DMA_STATE_BUSY;//to make sure the next HAL_DMA_Abort
 		HAL_DMA_Abort(m_huart->hdmarx);
@@ -1683,9 +1801,29 @@ void SlimSerial::txCpltCallback()
 	m_totalTxBytes += m_tx_last.dataBytes;
 	m_totalTxFrames ++;
 
+	if (m_tx_circular_buf.containsPointer(m_tx_last.pdata)) {
+		const uint32_t reclaimPrefixBytes = m_tx_circular_buf.distanceFromTail(m_tx_last.pdata);
+		const uint32_t reclaimFrameBytes = static_cast<uint32_t>(m_tx_last.dataBytes) + (m_9bits_mode ? 1u : 0u);
+		m_tx_circular_buf.discardN(reclaimPrefixBytes + reclaimFrameBytes);
+	}
+
 	//trigger another tx if tx queue is not empty.
-	if(pdPASS ==xQueueReceiveFromISR(m_tx_queue_meta, &m_tx_last, NULL)){
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	BaseType_t queueStatus = pdFAIL;
+	if(m_tx_queue_meta != NULL){
+		if (__get_IPSR() != 0U) {
+			queueStatus = xQueueReceiveFromISR(m_tx_queue_meta, &m_tx_last, &xHigherPriorityTaskWoken);
+		}
+		else {
+			queueStatus = xQueueReceive(m_tx_queue_meta, &m_tx_last, 0);
+		}
+	}
+
+	if(queueStatus == pdPASS){
 		transmitLL(m_tx_last); //transmit the next frame without taking the mutex, since we are already in the transmit context
+		if (__get_IPSR() != 0U) {
+			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		}
 	}
 	else{
 		m_writeLocked=false;
@@ -1706,8 +1844,8 @@ void SlimSerial::rxCpltCallback(uint16_t data_len)
 	//get current buffer index based on current NDTR
 	//NDTR   N 	 	N-1 	N-2 	N-3 	N-4    	...	  	1
 	//head   0		1		2		3	    4	 	...		N-1
-	uint32_t exactHead = m_rx_circular_buf.bufferSize - (uint16_t)__HAL_DMA_GET_COUNTER(m_huart->hdmarx);
-	uint32_t dlen = m_rx_circular_buf.in_dummy_with_new_masked_head(exactHead); //dummy in to update the circular buffer size
+	uint32_t exactHead = m_rx_circular_buf.capacity() - (uint16_t)__HAL_DMA_GET_COUNTER(m_huart->hdmarx);
+	uint32_t dlen = syncRxDmaCircularBufferHead(m_rx_circular_buf, exactHead); //dummy in to update the circular buffer size
 	m_totalRxBytes += dlen;
 
 	if(rxThreadID != NULL) {
@@ -1916,8 +2054,7 @@ void SlimSerial::frameParser(){
 
 									else {
 										//bad crc
-										  int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-										  m_parse_remainingBytes -= discardN;
+										m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 										m_rx_status = SD_USART_ERROR;
 										continue;
 									}
@@ -1930,28 +2067,24 @@ void SlimSerial::frameParser(){
 								}
 							}
 							else{//invalid length
-								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-								m_parse_remainingBytes -= discardN;
+								m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
 						}
 						else{//invalid funcode
-							int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-							m_parse_remainingBytes -= discardN;
+							m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
 					}
 					else{//invalid address
-						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-						m_parse_remainingBytes -= discardN;
+						m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
 				} else {//invalid header
-					int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-					m_parse_remainingBytes -= discardN;
+					m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
@@ -2032,8 +2165,7 @@ void SlimSerial::frameParser(){
 								continue;
 							}
 							else {
-								int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-								m_parse_remainingBytes -= discardN;
+								m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 								m_rx_status = SD_USART_ERROR;
 								continue;
 							}
@@ -2044,21 +2176,18 @@ void SlimSerial::frameParser(){
 						}
 					}
 					else{
-						int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-						m_parse_remainingBytes -= discardN;
+						m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 						m_rx_status = SD_USART_ERROR;
 						continue;
 					}
 				}
 				else{
-					int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-					m_parse_remainingBytes -= discardN;
+					m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
 			} else {
-				int discardN = m_rx_circular_buf.discardUntilNext(0x5A);
-				m_parse_remainingBytes -= discardN;
+				m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0x5A);
 				m_rx_status = SD_USART_ERROR;
 				continue;
 			}
@@ -2126,8 +2255,7 @@ void SlimSerial::frameParser(){
 
 						else {
 							//bad crc
-							int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-							m_parse_remainingBytes -= discardN;
+							m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0xFF);
 							m_rx_status = SD_USART_ERROR;
 							continue;
 						}
@@ -2140,15 +2268,13 @@ void SlimSerial::frameParser(){
 					}
 				}
 				else{//invalid length
-					int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-					m_parse_remainingBytes -= discardN;
+					m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0xFF);
 					m_rx_status = SD_USART_ERROR;
 					continue;
 				}
 
 			} else {//invalid header
-				int discardN = m_rx_circular_buf.discardUntilNext(0xFF);
-				m_parse_remainingBytes -= discardN;
+				m_parse_remainingBytes -= discardUntilNextHeaderCandidate(0xFF);
 				m_rx_status = SD_USART_ERROR;
 				continue;
 			}
@@ -2419,7 +2545,7 @@ SLIMSERIAL_PROXY_MODE SlimSerial::getProxyMode() {
 void SlimSerial::proxyDelegateMessage(uint8_t *pData,uint16_t dataBytes){
 	SD_BUF_INFO sd_buf_info;
 
-//	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.bufferSize){
+//	if((databytes+1u)>m_proxy_port->m_tx_circular_buf.capacity()){
 //		sd_buf_info = bufferTxData(m_proxy_circular_buffer, pData, databytes);
 //	}
 //	else{

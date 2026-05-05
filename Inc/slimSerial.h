@@ -303,6 +303,7 @@ private:
 
 	SD_BUF_INFO bufferTxData(SLIM_CURCULAR_BUFFER &tx_circular_buf,uint8_t *pSrc,uint16_t datalen);
 	SD_BUF_INFO bufferTxData(uint8_t *pSrc,uint16_t datalen);
+	SD_USART_StatusTypeDef enqueueTxBuffer(const SD_BUF_INFO &txBufInfo);
 
 	SD_USART_StatusTypeDef transmitLL_try();
 	SD_USART_StatusTypeDef transmitLL(SD_BUF_INFO &txBufInfo);
@@ -316,6 +317,7 @@ private:
     bool applyFuncodeFilter(uint8_t funcode);
 
     void clearFlags();
+	uint32_t discardUntilNextHeaderCandidate(uint8_t fallbackHeader);
 
 	std::array<std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)>, SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN> m_frameCallbackFuncArray;
 	void (*m_frameCallbackFuncArray_C[SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN])(SlimSerial *,uint8_t *,uint16_t );
