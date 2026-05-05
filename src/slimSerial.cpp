@@ -11,6 +11,34 @@
 
 namespace {
 
+inline uint32_t roundPositiveToU32(float value)
+{
+	if (value <= 0.0f) {
+		return 0;
+	}
+
+	return static_cast<uint32_t>(value + 0.5f);
+}
+
+inline uint32_t timeoutMsToUs(float timeout_ms)
+{
+	if (timeout_ms <= 0.0f) {
+		return 0;
+	}
+
+	return static_cast<uint32_t>((timeout_ms * 1000.0f) + 0.5f);
+}
+
+inline TickType_t timeoutNotifyTicks(float timeout_ms)
+{
+	uint32_t ticks = roundPositiveToU32(timeout_ms);
+	if (ticks < 2u) {
+		ticks = 2u;
+	}
+
+	return static_cast<TickType_t>(ticks);
+}
+
 uint32_t syncRxDmaCircularBufferHead(SLIM_CURCULAR_BUFFER& rxBuffer, uint32_t newHeadMasked)
 {
 	if (newHeadMasked == 0u && rxBuffer.writeIndexMasked() == 0u) {
@@ -486,6 +514,12 @@ SlimSerial::SlimSerial(UART_HandleTypeDef *uartHandle,
 	m_huart = uartHandle;
 	m_port_index = getSlimSerialIndex(m_huart);
 
+	headerFilterOn = false;
+	headerFilter_num = 0;
+	addressFilterOn = false;
+	addressFilter_num = 0;
+	funcodeFilterOn = false;
+	funcodeFilter_num = 0;
 
 
 	//rx data
@@ -751,7 +785,7 @@ void SlimSerial::setTimeout(float timeout_ms){
 
 		__HAL_TIM_SET_COUNTER(m_timeout_htim,0); //reset the timer counter
 
-		__HAL_TIM_SET_AUTORELOAD(m_timeout_htim, std::lround(timeout_ms*1000)); //convert ms to us
+		__HAL_TIM_SET_AUTORELOAD(m_timeout_htim, timeoutMsToUs(timeout_ms)); //convert ms to us
 
 		HAL_TIM_Base_Start_IT(m_timeout_htim); //start the timer to measure tx rx timeout
 	}
@@ -1582,6 +1616,12 @@ uint32_t SlimSerial::discardUntilNextHeaderCandidate(uint8_t fallbackHeader){
 
 
 SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,float timeout_ms, bool frameTypeFilterOn){
+	if(m_huart == NULL || m_txrxMutex == NULL){
+		m_rx_status = SD_USART_ERROR;
+		m_rx_last.dataBytes = 0;
+		return m_rx_last;
+	}
+
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
 		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
@@ -1590,10 +1630,10 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 	//need txrxmutex
 	uint32_t t1 = currentTime_us();
-	if(xSemaphoreTake(m_txrxMutex, std::lround(timeout_ms)) != pdTRUE){
+	if(xSemaphoreTake(m_txrxMutex, roundPositiveToU32(timeout_ms)) != pdTRUE){
 		m_rx_status = SD_USART_TIMEOUT;
 		m_rx_last.dataBytes=0;
-		m_txrxMutex_aquire_time_us= std::lround(timeout_ms)*1000;
+		m_txrxMutex_aquire_time_us= timeoutMsToUs(timeout_ms);
 		m_txrxMutex_aquire_failed_count++;
 		return  m_rx_last;
 	}
@@ -1621,10 +1661,21 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 #endif
 
 	//start a tx frame
-	transmitData(pData, dataBytes);
+	SD_USART_StatusTypeDef txStatus = transmitData(pData, dataBytes);
+	if(txStatus != SD_USART_OK){
+		m_rx_status = txStatus;
+		m_rx_last.dataBytes=0;
+#if ANY_TIMEOUT_TIMER_USED
+		stopTimeout();
+#endif
+		m_rx_frame_type = rxFrameType_temp;
+		txrxThreadID = nullptr;
+		xSemaphoreGive(m_txrxMutex);
+		return m_rx_last;
+	}
 
 	//1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
-	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,std::max(2l,std::lround(timeout_ms)));
+	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE, timeoutNotifyTicks(timeout_ms));
 
 
 	if(ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_FRAME){
@@ -1656,6 +1707,12 @@ SD_BUF_INFO &SlimSerial::transmitReceiveData(uint8_t *pData,uint16_t dataBytes,f
 
 
 SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,uint8_t *payload,uint16_t payloadBytes,float timeout_ms){
+	if(m_huart == NULL || m_txrxMutex == NULL){
+		m_rx_status = SD_USART_ERROR;
+		m_rx_last.dataBytes = 0;
+		return m_rx_last;
+	}
+
 	if(getProxyMode()==SLIMSERIAL_TXRX_TRANSPARENT){
 		m_rx_status = SD_USART_PROXY;
 		m_rx_last.dataBytes=0;
@@ -1664,10 +1721,10 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 
 	//need txrxmutex
 	uint32_t t1 = currentTime_us();
-	if(xSemaphoreTake(m_txrxMutex, std::lround(timeout_ms)) != pdTRUE){
+	if(xSemaphoreTake(m_txrxMutex, roundPositiveToU32(timeout_ms)) != pdTRUE){
 		m_rx_status = SD_USART_TIMEOUT;
 		m_rx_last.dataBytes=0;
-		m_txrxMutex_aquire_time_us= std::lround(timeout_ms)*1000;
+		m_txrxMutex_aquire_time_us= timeoutMsToUs(timeout_ms);
 		return  m_rx_last;
 	}
 	m_txrxMutex_aquire_time_us= currentTime_us() - t1;
@@ -1687,10 +1744,20 @@ SD_BUF_INFO &SlimSerial::transmitReceiveFrame(uint16_t address,uint16_t fcode,ui
 #endif
 
 	//start a tx frame
-	transmitFrame(address, fcode, payload, payloadBytes);
+	SD_USART_StatusTypeDef txStatus = transmitFrame(address, fcode, payload, payloadBytes);
+	if(txStatus != SD_USART_OK){
+		m_rx_status = txStatus;
+		m_rx_last.dataBytes=0;
+#if ANY_TIMEOUT_TIMER_USED
+		stopTimeout();
+#endif
+		txrxThreadID = nullptr;
+		xSemaphoreGive(m_txrxMutex);
+		return m_rx_last;
+	}
 
 	//1ms timeout cannot be guaranteed by freeRTOS, so add 1ms to it.
-	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE,std::max(2l,std::lround(timeout_ms)));
+	uint32_t ulTaskNotifyRet = ulTaskNotifyTake(pdTRUE, timeoutNotifyTicks(timeout_ms));
 
 
 	if(ulTaskNotifyRet & SLIMSERIAL_NOTIFICATION_BIT_FRAME){
