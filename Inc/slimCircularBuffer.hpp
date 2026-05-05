@@ -9,6 +9,7 @@
 #pragma once
 
 #include "main.h"
+#include <stdint.h>
 #include <string.h>
 #include "stdio.h"
 #include "slimCRC.h"
@@ -65,14 +66,20 @@ public:
 		tail = 0;
 	}
 
-	uint32_t availableData() {
+	uint32_t availableData() const {
 		return (head - tail);
 	}
 
-	//enable overflow wrap
+	// Lossy write path. Prefer tryIn/tryInDummy for strict producer/consumer usage.
 	template<typename  T>
 	requires IsUint8OrUint16<T>
 	uint32_t in(const T* pSrc, uint32_t len) {
+		return writeLossy(pSrc, len);
+	}
+
+	template<typename  T>
+	requires IsUint8OrUint16<T>
+	uint32_t writeLossy(const T* pSrc, uint32_t len) {
 		uint32_t ltemp = unusedSpace();
 
 
@@ -87,6 +94,10 @@ public:
 
 
 	uint32_t in_dummy(uint32_t len) {
+		return advanceWriteLossy(len);
+	}
+
+	uint32_t advanceWriteLossy(uint32_t len) {
 		uint32_t ltemp = unusedSpace();
 
 		head += len;
@@ -97,26 +108,41 @@ public:
 		return len;
 	}
 
-	//called in the DMA callback to update the buffer head and tail
-	uint32_t in_dummy_with_new_masked_head(uint32_t inNewHeadMasked) {
-		uint32_t lastHeadMasked = head & mask;
+	template<typename  T>
+	requires IsUint8OrUint16<T>
+	bool tryIn(const T* pSrc, uint32_t len) {
+		if (len > unusedSpace()) {
+			return false;
+		}
 
-		//If two interrupts are triggered together, IDLE line and DMA_IT_TC callback. we ignore one.
-		if(inNewHeadMasked==0 && lastHeadMasked==0){
-            return 0;
-        }
+		copy_in(pSrc, len, head);
+		head += len;
+		return true;
+	}
+
+	bool tryInDummy(uint32_t len) {
+		if (len > unusedSpace()) {
+			return false;
+		}
+
+		head += len;
+		return true;
+	}
+
+	uint32_t syncExternalWriteHeadMaskedLossy(uint32_t inNewHeadMasked) {
+		uint32_t lastHeadMasked = head & mask;
 
 		//determine new arrived data len
 		uint32_t len=0;
 
-        //if the new head is larger than the last head, no wrap around
+		//if the new head is larger than the last head, no wrap around
 		if(inNewHeadMasked>=lastHeadMasked){
-            //no wrap around
+			//no wrap around
 			len =  inNewHeadMasked - lastHeadMasked;
-        }
-        else{
-        	len = (bufferSize - lastHeadMasked) + inNewHeadMasked;
-        }
+		}
+		else{
+			len = (bufferSize - lastHeadMasked) + inNewHeadMasked;
+		}
 
 
 		uint32_t lavail = availableData();
@@ -142,12 +168,6 @@ public:
 				uint32_t loverflow = (len > ltemp) ? len - ltemp : 0;
 				tail += loverflow;
 			}
-		}
-
-		//discard the data if the 9th bit address byte if set
-		if(m_U16_mode && ((bufferU16[tail & mask]>>8) & 0x01)==1){
-			tail++;
-			len--;
 		}
 
 		return len;
@@ -233,22 +253,44 @@ public:
 		return len;
 	}
 
-	inline uint32_t unusedSpace() {
+	inline uint32_t unusedSpace() const {
 		return (uint32_t)(bufferSize - (head - tail));
 	}
 
-	inline uint32_t isEmpty() {
+	inline uint32_t isEmpty() const {
 		return (uint32_t)(head == tail);
 	}
 
-	inline uint32_t isFull() {
+	inline uint32_t isFull() const {
 		return ((head - tail) > mask);
 	}
 
-	inline uint32_t unusedContinuousSpace() {
-		uint32_t off = tail & mask;
+	inline uint32_t unusedContinuousSpace() const {
+		uint32_t off = head & mask;
+		uint32_t contiguousToEnd = (uint32_t)(bufferSize - off);
+		uint32_t freeBytes = unusedSpace();
 
-		return (uint32_t)(bufferSize - off);
+		return (contiguousToEnd < freeBytes) ? contiguousToEnd : freeBytes;
+	}
+
+	inline bool isU16Mode() const {
+		return m_U16_mode != 0u;
+	}
+
+	inline uint8_t *data() {
+		return buffer;
+	}
+
+	inline const uint8_t *data() const {
+		return buffer;
+	}
+
+	inline uint32_t capacity() const {
+		return bufferSize;
+	}
+
+	inline uint32_t writeIndexMasked() const {
+		return head & mask;
 	}
 
 
@@ -310,11 +352,41 @@ public:
         return m_U16_mode?(uint8_t *)((bufferU16 + (tail & mask))):(uint8_t *)((buffer + (tail & mask)));
     }
 
+	bool containsPointer(const uint8_t* ptr) const {
+		if (ptr == nullptr || buffer == nullptr) {
+			return false;
+		}
+
+		const uintptr_t start = reinterpret_cast<uintptr_t>(buffer);
+		const uintptr_t span = static_cast<uintptr_t>(bufferSize) * (m_U16_mode ? sizeof(uint16_t) : sizeof(uint8_t));
+		const uintptr_t end = start + span;
+		const uintptr_t value = reinterpret_cast<uintptr_t>(ptr);
+		return value >= start && value < end;
+	}
+
+	uint32_t distanceFromTail(const uint8_t* ptr) const {
+		if (!containsPointer(ptr)) {
+			return 0;
+		}
+
+		const uint32_t tailIndex = tail & mask;
+		if (m_U16_mode) {
+			const uintptr_t start = reinterpret_cast<uintptr_t>(bufferU16);
+			const uintptr_t value = reinterpret_cast<uintptr_t>(ptr);
+			const uint32_t ptrIndex = static_cast<uint32_t>((value - start) / sizeof(uint16_t));
+			return (ptrIndex >= tailIndex) ? (ptrIndex - tailIndex) : (bufferSize - tailIndex + ptrIndex);
+		}
+
+		const uintptr_t start = reinterpret_cast<uintptr_t>(buffer);
+		const uintptr_t value = reinterpret_cast<uintptr_t>(ptr);
+		const uint32_t ptrIndex = static_cast<uint32_t>(value - start);
+		return (ptrIndex >= tailIndex) ? (ptrIndex - tailIndex) : (bufferSize - tailIndex + ptrIndex);
+	}
+private:
 	uint8_t		*buffer;
 	uint16_t	*bufferU16;
 	uint32_t	bufferSize;
 	uint8_t     m_U16_mode=0;
-private:
 
 
 
