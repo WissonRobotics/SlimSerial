@@ -317,6 +317,10 @@ private:
     bool applyFuncodeFilter(uint8_t funcode);
 
     void clearFlags();
+	void finalizeRxFrame(uint16_t frameBytes);
+	void publishRxFrame();
+	bool frameHasValidCrc(uint16_t frameBytes);
+	bool publishAnyFramedCandidate(uint8_t frameType);
 	uint32_t discardUntilNextHeaderCandidate(uint8_t fallbackHeader);
 
 	std::array<std::function<void(SlimSerial *slimSerialDev,uint8_t *pdata,uint16_t databytes)>, SLIMSERIAL_RX_CALLBACK_ARRAY_MAX_LEN> m_frameCallbackFuncArray;
